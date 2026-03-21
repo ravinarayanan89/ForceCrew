@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>Platform Event published by FC_CrewQueueable when an async crew run completes or fails. LWC components subscribe via lightning/empApi to receive real-time results.</description>
+    <label>Crew Event</label>
+    <pluralLabel>Crew Events</pluralLabel>
+    <publishBehavior>PublishAfterCommit</publishBehavior>
+</CustomObject>

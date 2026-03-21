@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>FinalOutput__c</fullName>
+    <label>Final Output</label>
+    <description>The final answer produced by the crew — output of the last successful task. Written by the finalising job.</description>
+    <type>LongTextArea</type>
+    <length>32768</length>
+    <visibleLines>10</visibleLines>
+    <externalId>false</externalId>
+    <trackTrending>false</trackTrending>
+</CustomField>

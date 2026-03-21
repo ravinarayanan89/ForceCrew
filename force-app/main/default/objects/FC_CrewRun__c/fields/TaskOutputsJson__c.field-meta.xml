@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>TaskOutputsJson__c</fullName>
+    <label>Task Outputs JSON</label>
+    <description>Serialised Map of task name to output string. Updated after each task completes. Read by subsequent tasks for context injection.</description>
+    <type>LongTextArea</type>
+    <length>131072</length>
+    <visibleLines>5</visibleLines>
+    <externalId>false</externalId>
+    <trackTrending>false</trackTrending>
+</CustomField>

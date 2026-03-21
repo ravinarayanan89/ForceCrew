@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>CrewConfigJson__c</fullName>
+    <label>Crew Config JSON</label>
+    <description>Serialised FC_CrewQueueable.CrewRunConfig — crew name, agent configs (role, goal, toolClassNames), task configs. Written once at enqueue time; read by every subsequent job.</description>
+    <type>LongTextArea</type>
+    <length>131072</length>
+    <visibleLines>5</visibleLines>
+    <externalId>false</externalId>
+    <trackTrending>false</trackTrending>
+</CustomField>

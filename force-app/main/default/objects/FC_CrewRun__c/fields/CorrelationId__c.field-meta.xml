@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>CorrelationId__c</fullName>
+    <label>Correlation Id</label>
+    <description>Optional external identifier supplied by the caller (e.g., a record Id or session Id). Carried through to FC_CrewEvent__e so the LWC can match the async result to the originating context.</description>
+    <type>Text</type>
+    <length>255</length>
+    <externalId>false</externalId>
+    <trackTrending>false</trackTrending>
+    <unique>false</unique>
+</CustomField>

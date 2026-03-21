@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ForceCrew Architecture</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 1200px;
+    height: 675px;
+    background: #050e1f;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ── Background grid ── */
+  .bg-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(1,118,211,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(1,118,211,0.07) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* ── Glow blobs ── */
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.18;
+    pointer-events: none;
+  }
+  .blob-blue  { width:500px; height:500px; background:#0176d3; top:-100px; left:-80px; }
+  .blob-teal  { width:380px; height:380px; background:#06a59a; bottom:-80px; right:80px; }
+  .blob-purple{ width:300px; height:300px; background:#7b2ff7; top:100px; right:-60px; }
+
+  /* ── Main canvas ── */
+  .canvas {
+    position: relative;
+    width: 1200px;
+    height: 675px;
+    padding: 28px 32px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo-group {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .logo-badge {
+    width: 48px; height: 48px;
+    background: linear-gradient(135deg, #0176d3, #06a59a);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 900; color: #fff;
+    box-shadow: 0 0 24px rgba(1,118,211,0.5);
+    letter-spacing: -1px;
+  }
+  .title-block {}
+  .title-main {
+    font-size: 28px; font-weight: 800;
+    background: linear-gradient(90deg, #ffffff, #82c9ff);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    line-height: 1;
+  }
+  .title-sub {
+    font-size: 12px; font-weight: 500; color: #7eb8f7;
+    margin-top: 3px; letter-spacing: 0.5px;
+  }
+  .header-pill {
+    background: rgba(1,118,211,0.2);
+    border: 1px solid rgba(1,118,211,0.4);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 11px; font-weight: 600; color: #82c9ff;
+    letter-spacing: 1px;
+  }
+
+  /* ── Main layout ── */
+  .main {
+    display: grid;
+    grid-template-columns: 248px 1fr 260px;
+    gap: 12px;
+    flex: 1;
+  }
+
+  /* ── Panel base ── */
+  .panel {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 14px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    backdrop-filter: blur(6px);
+  }
+  .panel-title {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 1.2px; text-transform: uppercase;
+    color: #7eb8f7;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .panel-title .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+  }
+
+  /* ── Left col: Core Framework ── */
+  .framework-item {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 10px 12px;
+    position: relative;
+  }
+  .fw-label {
+    font-size: 13px; font-weight: 700; color: #fff;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .fw-icon {
+    width: 26px; height: 26px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+  .fw-desc {
+    font-size: 10px; color: #8fa3bd; margin-top: 3px; line-height: 1.4;
+  }
+  .fw-chips {
+    display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;
+  }
+  .chip {
+    font-size: 9px; font-weight: 600;
+    padding: 2px 7px; border-radius: 10px;
+    letter-spacing: 0.3px;
+  }
+  .chip-blue   { background: rgba(1,118,211,0.25); color: #82c9ff; border: 1px solid rgba(1,118,211,0.3); }
+  .chip-teal   { background: rgba(6,165,154,0.25); color: #5ee0da; border: 1px solid rgba(6,165,154,0.3); }
+  .chip-purple { background: rgba(123,47,247,0.25); color: #c4a2ff; border: 1px solid rgba(123,47,247,0.3); }
+  .chip-orange { background: rgba(244,160,32,0.2); color: #ffc85c; border: 1px solid rgba(244,160,32,0.3); }
+  .chip-green  { background: rgba(46,132,74,0.25); color: #70e08a; border: 1px solid rgba(46,132,74,0.3); }
+
+  /* ── Connector arrows ── */
+  .connector {
+    text-align: center; color: rgba(255,255,255,0.2);
+    font-size: 14px; line-height: 1; padding: 0;
+  }
+
+  /* ── Middle col: ReAct Engine ── */
+  .react-loop {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+  }
+  .react-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 9px 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+    position: relative;
+  }
+  .step-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(135deg,#0176d3,#06a59a);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 800; color: #fff;
+    flex-shrink: 0;
+  }
+  .step-text { font-size: 11.5px; font-weight: 600; color: #e0eeff; }
+  .step-sub  { font-size: 10px; color: #7a94ae; margin-top: 1px; }
+  .step-badge {
+    margin-left: auto;
+    font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 8px;
+    flex-shrink: 0;
+  }
+  .badge-tool   { background:rgba(244,160,32,0.2);  color:#ffc85c; }
+  .badge-answer { background:rgba(46,132,74,0.25);  color:#70e08a; }
+  .badge-loop   { background:rgba(1,118,211,0.25);  color:#82c9ff; }
+
+  .react-decision {
+    display: flex; gap: 6px;
+  }
+  .decision-box {
+    flex: 1;
+    border-radius: 10px;
+    padding: 9px 10px;
+    border: 1px solid;
+    text-align: center;
+  }
+  .decision-box .d-icon { font-size: 18px; }
+  .decision-box .d-title { font-size: 11px; font-weight: 700; margin-top: 3px; }
+  .decision-box .d-sub   { font-size: 9px; margin-top: 2px; }
+  .decision-tool {
+    background: rgba(244,160,32,0.08);
+    border-color: rgba(244,160,32,0.3);
+    color: #ffc85c;
+  }
+  .decision-answer {
+    background: rgba(46,132,74,0.1);
+    border-color: rgba(46,132,74,0.35);
+    color: #70e08a;
+  }
+
+  /* ── Right col: Execution Modes ── */
+  .mode-card {
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255,255,255,0.09);
+    position: relative;
+    overflow: hidden;
+  }
+  .mode-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 2px 0 0 2px;
+  }
+  .mode-sync::before    { background: #0176d3; }
+  .mode-step::before    { background: #f4a020; }
+  .mode-async::before   { background: #06a59a; }
+
+  .mode-header {
+    display: flex; align-items: center; gap: 7px; margin-bottom: 4px;
+  }
+  .mode-icon {
+    width: 22px; height: 22px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+  }
+  .mode-title { font-size: 12px; font-weight: 700; color: #fff; }
+  .mode-tag   { margin-left: auto; font-size: 9px; font-weight: 700; padding: 1px 7px; border-radius: 8px; }
+  .tag-green  { background:rgba(46,132,74,0.25);  color:#70e08a; }
+  .tag-orange { background:rgba(244,160,32,0.2);  color:#ffc85c; }
+  .tag-teal   { background:rgba(6,165,154,0.25);  color:#5ee0da; }
+  .mode-flow  { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+  .flow-box {
+    font-size: 9.5px; font-weight: 600; padding: 3px 7px; border-radius: 6px;
+    background: rgba(255,255,255,0.07); color: #c8ddf0;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .flow-arr { font-size: 9px; color: rgba(255,255,255,0.25); }
+  .mode-limit { font-size: 9px; color: #5a7a9a; margin-top: 4px; }
+
+  /* ── Bottom bar: Foundation ── */
+  .foundation {
+    background: linear-gradient(90deg, rgba(1,118,211,0.12), rgba(6,165,154,0.12));
+    border: 1px solid rgba(1,118,211,0.2);
+    border-radius: 12px;
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .foundation-label {
+    font-size: 10px; font-weight: 700; color: #7eb8f7;
+    letter-spacing: 1px; text-transform: uppercase;
+    min-width: 120px;
+  }
+  .foundation-items {
+    display: flex; gap: 8px; flex-wrap: wrap; flex: 1;
+  }
+  .f-pill {
+    display: flex; align-items: center; gap: 5px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 4px 11px;
+    font-size: 10.5px; font-weight: 600; color: #c8ddf0;
+  }
+  .f-pill .f-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .foundation-credit {
+    font-size: 10px; color: #3d6080; font-weight: 500;
+    white-space: nowrap; margin-left: 8px;
+  }
+</style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="blob blob-blue"></div>
+  <div class="blob blob-teal"></div>
+  <div class="blob blob-purple"></div>
+
+  <div class="canvas">
+
+    <!-- ── HEADER ── -->
+    <div class="header">
+      <div class="logo-group">
+        <div class="logo-badge">FC</div>
+        <div class="title-block">
+          <div class="title-main">ForceCrew</div>
+          <div class="title-sub">crewAI-Inspired Multi-Agent Framework for Salesforce Apex</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div class="header-pill">APEX · API v62.0</div>
+        <div class="header-pill">MODELS API NATIVE</div>
+        <div class="header-pill">Open Source</div>
+      </div>
+    </div>
+
+    <!-- ── MAIN GRID ── -->
+    <div class="main">
+
+      <!-- LEFT: Core Framework -->
+      <div class="panel">
+        <div class="panel-title">
+          <span class="dot" style="background:#0176d3"></span>
+          Core Framework
+        </div>
+
+        <!-- FC_Crew -->
+        <div class="framework-item" style="border-color:rgba(1,118,211,0.35);background:rgba(1,118,211,0.08);">
+          <div class="fw-label">
+            <div class="fw-icon" style="background:rgba(1,118,211,0.3);">🚢</div>
+            FC_Crew
+          </div>
+          <div class="fw-desc">Orchestrates agents + tasks. Sequential or Hierarchical process.</div>
+          <div class="fw-chips">
+            <span class="chip chip-blue">kickoff()</span>
+            <span class="chip chip-blue">SEQUENTIAL</span>
+            <span class="chip chip-purple">HIERARCHICAL</span>
+          </div>
+        </div>
+
+        <div class="connector">↓</div>
+
+        <!-- FC_Agent -->
+        <div class="framework-item" style="border-color:rgba(6,165,154,0.35);background:rgba(6,165,154,0.07);">
+          <div class="fw-label">
+            <div class="fw-icon" style="background:rgba(6,165,154,0.3);">🤖</div>
+            FC_Agent
+          </div>
+          <div class="fw-desc">Role · Goal · Backstory · Tools · LLM Model</div>
+          <div class="fw-chips">
+            <span class="chip chip-teal">Builder</span>
+            <span class="chip chip-teal">maxIterations</span>
+          </div>
+        </div>
+
+        <div class="connector">↓</div>
+
+        <!-- FC_Task -->
+        <div class="framework-item" style="border-color:rgba(123,47,247,0.35);background:rgba(123,47,247,0.07);">
+          <div class="fw-label">
+            <div class="fw-icon" style="background:rgba(123,47,247,0.3);">📋</div>
+            FC_Task
+          </div>
+          <div class="fw-desc">Description · Expected Output · Context chaining between tasks</div>
+          <div class="fw-chips">
+            <span class="chip chip-purple">withContext()</span>
+            <span class="chip chip-purple">Builder</span>
+          </div>
+        </div>
+
+        <div class="connector">↓</div>
+
+        <!-- FC_Tool / FC_IMCPTool -->
+        <div class="framework-item" style="border-color:rgba(244,160,32,0.35);background:rgba(244,160,32,0.07);">
+          <div class="fw-label">
+            <div class="fw-icon" style="background:rgba(244,160,32,0.3);">🔧</div>
+            FC_Tool / FC_IMCPTool
+          </div>
+          <div class="fw-desc">Apex methods as tools. Implement FC_IMCPTool for auto schema.</div>
+          <div class="fw-chips">
+            <span class="chip chip-orange">fromMCP()</span>
+            <span class="chip chip-orange">fromClassName()</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- MIDDLE: ReAct Engine -->
+      <div class="panel">
+        <div class="panel-title">
+          <span class="dot" style="background:#06a59a"></span>
+          ReAct Execution Engine  (FC_AgentExecutor)
+        </div>
+
+        <div class="react-loop">
+          <div class="react-step" style="border-color:rgba(1,118,211,0.25);background:rgba(1,118,211,0.07);">
+            <div class="step-num">1</div>
+            <div>
+              <div class="step-text">System Prompt Injection</div>
+              <div class="step-sub">Role · Goal · Backstory · Tool Schema (JSON)</div>
+            </div>
+          </div>
+
+          <div class="react-step" style="border-color:rgba(123,47,247,0.25);background:rgba(123,47,247,0.06);">
+            <div class="step-num">2</div>
+            <div>
+              <div class="step-text">Task Prompt + Prior Context</div>
+              <div class="step-sub">Outputs of dependency tasks injected automatically</div>
+            </div>
+          </div>
+
+          <div class="react-step" style="border-color:rgba(6,165,154,0.3);background:rgba(6,165,154,0.07);">
+            <div class="step-num">3</div>
+            <div>
+              <div class="step-text">LLM Call → Salesforce Models API</div>
+              <div class="step-sub">aiplatform.ModelsAPI.createChatGenerations()</div>
+            </div>
+            <div class="step-badge badge-loop">1 call / step</div>
+          </div>
+
+          <div class="react-step" style="border-color:rgba(1,118,211,0.2);">
+            <div class="step-num">4</div>
+            <div>
+              <div class="step-text">Parse JSON Response</div>
+              <div class="step-sub">Strip markdown fences → deserializeUntyped()</div>
+            </div>
+          </div>
+
+          <!-- Decision split -->
+          <div class="react-decision">
+            <div class="decision-box decision-tool">
+              <div class="d-icon">🔧</div>
+              <div class="d-title">TOOL_CALL</div>
+              <div class="d-sub">Execute Apex tool<br>Feed result → LLM<br>Loop ↻</div>
+            </div>
+            <div class="decision-box decision-answer">
+              <div class="d-icon">✅</div>
+              <div class="d-title">FINAL_ANSWER</div>
+              <div class="d-sub">Return output<br>Pass to next task<br>Done ✓</div>
+            </div>
+          </div>
+
+          <!-- Manager Agent note -->
+          <div class="react-step" style="border-color:rgba(123,47,247,0.3);background:rgba(123,47,247,0.06);">
+            <div style="font-size:14px;">👔</div>
+            <div>
+              <div class="step-text">FC_ManagerAgent — Hierarchical Only</div>
+              <div class="step-sub">LLM manager issues DELEGATE directives to agents dynamically</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Execution Modes -->
+      <div class="panel">
+        <div class="panel-title">
+          <span class="dot" style="background:#f4a020"></span>
+          Execution Modes
+        </div>
+
+        <!-- Mode 1 -->
+        <div class="mode-card mode-sync">
+          <div class="mode-header">
+            <div class="mode-icon" style="background:rgba(1,118,211,0.25);">⚡</div>
+            <div class="mode-title">Synchronous</div>
+            <div class="mode-tag tag-green">Simple tasks</div>
+          </div>
+          <div class="mode-flow">
+            <span class="flow-box">FC_Crew</span>
+            <span class="flow-arr">→</span>
+            <span class="flow-box">kickoff()</span>
+            <span class="flow-arr">→</span>
+            <span class="flow-box">FC_CrewExecutor</span>
+          </div>
+          <div class="mode-limit">⚠ 1 transaction · ~5–10 LLM calls max</div>
+        </div>
+
+        <!-- Mode 2 -->
+        <div class="mode-card mode-step">
+          <div class="mode-header">
+            <div class="mode-icon" style="background:rgba(244,160,32,0.25);">🔄</div>
+            <div class="mode-title">Step-by-Step (LWC)</div>
+            <div class="mode-tag tag-orange">Interactive UI</div>
+          </div>
+          <div class="mode-flow">
+            <span class="flow-box">initAgentStep()</span>
+            <span class="flow-arr">→</span>
+            <span class="flow-box">runAgentStep()</span>
+            <span class="flow-arr">×N</span>
+          </div>
+          <div style="margin-top:5px;">
+            <div class="mode-flow">
+              <span class="flow-box">FC_StepRequest</span>
+              <span class="flow-arr">→</span>
+              <span class="flow-box" style="color:#ffc85c;">LWC holds state</span>
+            </div>
+          </div>
+          <div class="mode-limit">✅ 1 LLM call per transaction · unlimited steps</div>
+        </div>
+
+        <!-- Mode 3 -->
+        <div class="mode-card mode-async">
+          <div class="mode-header">
+            <div class="mode-icon" style="background:rgba(6,165,154,0.25);">🔀</div>
+            <div class="mode-title">Async Queueable</div>
+            <div class="mode-tag tag-teal">Complex crews</div>
+          </div>
+          <div class="mode-flow">
+            <span class="flow-box">Job[0]</span>
+            <span class="flow-arr">→</span>
+            <span class="flow-box">Job[1]</span>
+            <span class="flow-arr">→</span>
+            <span class="flow-box">Job[N]</span>
+          </div>
+          <div style="margin-top:5px;">
+            <div class="mode-flow">
+              <span class="flow-box" style="color:#5ee0da;">FC_CrewRun__c</span>
+              <span class="flow-arr">→</span>
+              <span class="flow-box" style="color:#5ee0da;">FC_CrewEvent__e</span>
+            </div>
+          </div>
+          <div class="mode-limit">✅ State in Custom Object · only Id passed between jobs</div>
+        </div>
+
+        <!-- Key rule -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:9px;padding:9px 11px;">
+          <div style="font-size:10px;font-weight:700;color:#5ee0da;margin-bottom:4px;letter-spacing:0.5px;">📐 KEY RULE — Async Tools</div>
+          <div style="font-size:9.5px;color:#7a94ae;line-height:1.5;">
+            Tools must implement <span style="color:#ffc85c;font-weight:600;">FC_IMCPTool</span> and be registered via
+            <span style="color:#ffc85c;font-weight:600;">fromClassName()</span>.<br>
+            Class name survives serialisation. Object instances do not.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── FOUNDATION BAR ── -->
+    <div class="foundation">
+      <div class="foundation-label">⚙ Foundation</div>
+      <div class="foundation-items">
+        <div class="f-pill">
+          <div class="f-dot" style="background:#0176d3"></div>
+          Salesforce Models API
+        </div>
+        <div class="f-pill">
+          <div class="f-dot" style="background:#06a59a"></div>
+          FC_Memory (short-term)
+        </div>
+        <div class="f-pill">
+          <div class="f-dot" style="background:#7b2ff7"></div>
+          FC_Logger (structured)
+        </div>
+        <div class="f-pill">
+          <div class="f-dot" style="background:#f4a020"></div>
+          FC_Exception hierarchy
+        </div>
+        <div class="f-pill">
+          <div class="f-dot" style="background:#2e844a"></div>
+          Builder Pattern (all DTOs)
+        </div>
+        <div class="f-pill">
+          <div class="f-dot" style="background:#e04040"></div>
+          with sharing · FLS enforced
+        </div>
+        <div class="f-pill">
+          <div class="f-dot" style="background:#888"></div>
+          37 Apex classes · Full test suite
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
