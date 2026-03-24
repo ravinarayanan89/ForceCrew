@@ -176,15 +176,11 @@ sf org login web --alias my-sandbox
 sf project deploy start --target-org my-sandbox
 ```
 
-### Required Custom Metadata (for Async Mode Only)
+### FC_CrewRun__c Custom Object (for Backend Async Only)
 
-If you want to use `FC_CrewQueueable` (background execution), you must create two metadata objects in your org. Run this in Anonymous Apex to see setup instructions:
+Only needed if you use `FC_CrewQueueable` from a **trigger, scheduled job, or batch process**. Not required for LWC — use the [Step-by-Step pattern](#step-by-step-lwc--recommended-for-complex-tasks) instead.
 
-```apex
-System.debug(FC_CrewQueueable.setupInstructions());
-```
-
-This will print out the **FC_CrewRun__c** custom object and **FC_CrewEvent__e** platform event definitions you need to create.
+`FC_CrewRun__c` is included in the repo and deploys automatically with `sf project deploy start`. No manual setup needed.
 
 ---
 
@@ -472,9 +468,20 @@ System.debug(logDump);
 
 ForceCrew provides `FC_CrewController` — an `@AuraEnabled` Apex controller with two integration patterns.
 
+### Choosing the Right LWC Pattern
+
+| Scenario | Recommended Pattern |
+|---|---|
+| Single agent, 1-3 tool calls expected | Full Transaction (`runCrewFromConfig` / `runSingleAgent`) |
+| Multi-agent crew or many ReAct steps | **Step-by-Step** (`initAgentStep` + `runAgentStep`) |
+| Backend trigger / scheduled job | Queueable — write result back to a record |
+| Long batch processing, no UI | Batch Apex |
+
+> **Why not Platform Events for LWC?** Platform Events are capped at **250,000 deliveries/day org-wide**. For a framework used frequently across multiple users or automations, this limit is hit quickly. The step-by-step pattern uses plain `@AuraEnabled` calls with no event consumption and is the preferred approach for all LWC integrations.
+
 ### Full Transaction (LWC)
 
-**Best for:** Short tasks that complete within a single Apex transaction.
+**Best for:** Short tasks that complete within a single Apex transaction (≤ 3 LLM calls expected).
 
 ```javascript
 // myAgentComponent.js
@@ -562,11 +569,13 @@ export default class MyAgentComponent extends LightningElement {
 }
 ```
 
-### Step-by-Step (LWC)
+### Step-by-Step (LWC) — Recommended for Complex Tasks
 
-**Best for:** Tasks requiring many tool calls or long ReAct loops that might hit governor limits in a single transaction.
+**Best for:** Multi-agent crews, tasks with many tool calls, or any ReAct loop that might exceed governor limits in a single transaction.
 
-Each `runAgentStep` call makes exactly one LLM call (and optionally one tool call). The LWC component drives the loop.
+Each `runAgentStep` call is a **separate Apex transaction** — governor limits reset on every call. The LWC JS holds the conversation state (`FC_StepRequest`) between calls. No Platform Events, no Queueable, no polling required.
+
+#### Single Agent, Step-by-Step
 
 ```javascript
 // myStepComponent.js
@@ -586,36 +595,32 @@ export default class MyStepComponent extends LightningElement {
             role: 'Analyst',
             goal: 'Query and analyse data.',
             backstory: 'Expert Salesforce developer.',
-            toolClassNames: ['FC_SampleSOQLTool', 'FC_SampleDescribeTool'],
-            maxIterations: 10,
-            llmModel: 'sfdc_ai__DefaultGPT4Omni'
+            toolClasses: ['FC_SampleSOQLTool', 'FC_SampleDescribeTool'],
+            maxIterations: 10
         };
 
         const taskConfig = {
             name: 'Analysis Task',
             description: 'Find the 5 accounts with the most open opportunities.',
             expectedOutput: 'A ranked list with account name and opportunity count.',
-            assignedAgentRole: 'Analyst',
-            contextTaskNames: []
+            assignToAgent: 'Analyst'
         };
 
         // Step 1: Initialise (no LLM call — just builds prompts and state)
         let state = await initAgentStep({
             agentConfigJson: JSON.stringify(agentConfig),
             taskConfigJson: JSON.stringify(taskConfig),
-            priorOutputsJson: JSON.stringify({})
+            priorOutputsJson: null
         });
 
-        // Steps 2..N: One LLM call per iteration
+        // Steps 2..N: One LLM call per Apex transaction
         while (!state.isComplete && !state.errorMessage) {
-            if (state.iterationCount >= state.maxIterations) break;
-
             state = await runAgentStep({
                 agentConfigJson: JSON.stringify(agentConfig),
-                stepRequestJson: JSON.stringify(state)
+                stepRequestJson: JSON.stringify(state)   // JS owns the memory
             });
 
-            // Render intermediate steps in UI
+            // Render intermediate steps in UI as they happen
             if (state.lastStepJson) {
                 this.steps = [...this.steps, JSON.parse(state.lastStepJson)];
             }
@@ -624,6 +629,50 @@ export default class MyStepComponent extends LightningElement {
         this.finalAnswer = state.finalAnswer;
         this.isRunning = false;
     }
+}
+```
+
+#### Multi-Agent Crew, JS-Driven
+
+For multi-agent crews, JS manages the `taskOutputs` map between agents. Each agent runs its own step loop and passes its result to the next.
+
+```javascript
+async runMultiAgentCrew() {
+    const tasks = [
+        {
+            agentConfig: { role: 'Researcher', goal: '...', backstory: '...', toolClasses: ['FC_SampleSOQLTool'] },
+            taskConfig:  { name: 'Gather Data', description: '...', expectedOutput: '...', assignToAgent: 'Researcher' }
+        },
+        {
+            agentConfig: { role: 'Writer', goal: '...', backstory: '...', toolClasses: [] },
+            taskConfig:  { name: 'Write Report', description: '...', expectedOutput: '...', assignToAgent: 'Writer', contextTasks: ['Gather Data'] }
+        }
+    ];
+
+    const taskOutputs = {};   // JS holds inter-task context — replaces FC_CrewExecutor's taskOutputs map
+
+    for (const { agentConfig, taskConfig } of tasks) {
+        let state = await initAgentStep({
+            agentConfigJson:  JSON.stringify(agentConfig),
+            taskConfigJson:   JSON.stringify(taskConfig),
+            priorOutputsJson: JSON.stringify(taskOutputs)   // prior task results injected as context
+        });
+
+        while (!state.isComplete && !state.errorMessage) {
+            state = await runAgentStep({
+                agentConfigJson: JSON.stringify(agentConfig),
+                stepRequestJson: JSON.stringify(state)
+            });
+            if (state.lastStepJson) {
+                this.steps = [...this.steps, JSON.parse(state.lastStepJson)];
+            }
+        }
+
+        // Store output for the next agent
+        taskOutputs[taskConfig.name] = state.finalAnswer;
+    }
+
+    this.finalAnswer = taskOutputs[tasks[tasks.length - 1].taskConfig.name];
 }
 ```
 
@@ -647,11 +696,13 @@ export default class MyStepComponent extends LightningElement {
 
 ## Async Execution (Queueable)
 
-For background execution, ForceCrew uses a **Queueable chain** — one job per task — with status tracked in a custom object and completion signalled via a Platform Event.
+**Use this for backend-only flows** — triggers, scheduled jobs, or batch processes where there is no UI waiting for a result. The crew runs in a Queueable chain and writes its result back to `FC_CrewRun__c` when complete. Query that record to check status or read the output.
+
+> For LWC integrations, use the [Step-by-Step pattern](#step-by-step-lwc--recommended-for-complex-tasks) instead.
 
 ### Setup
 
-1. Create the **FC_CrewRun__c** custom object:
+Create the **FC_CrewRun__c** custom object:
 
 | Field | Type | Size |
 |-------|------|------|
@@ -662,17 +713,6 @@ For background execution, ForceCrew uses a **Queueable chain** — one job per t
 | `FinalOutput__c` | Long Text Area | 32,768 |
 | `ErrorMessage__c` | Text | 1,024 |
 | `CorrelationId__c` | Text | 255 |
-
-2. Create the **FC_CrewEvent__e** Platform Event:
-
-| Field | Type | Size |
-|-------|------|------|
-| `CrewName__c` | Text | 255 |
-| `CorrelationId__c` | Text | 255 |
-| `RunId__c` | Text | 18 |
-| `FinalOutput__c` | Long Text Area | 32,768 |
-| `ErrorMessage__c` | Text | 1,024 |
-| `Success__c` | Checkbox | — |
 
 ### Enqueue a Crew
 
@@ -695,42 +735,21 @@ Id runId = FC_CrewQueueable.enqueue(crew, new Map<String, Object>(), 'my-correla
 
 > **Important:** Tools in async crews must be registered via `FC_Tool.fromClassName('ClassName')`. Tools registered with `FC_Tool.from(name, desc, new MyTool())` hold object references that cannot be serialised across Queueable jobs.
 
-### Subscribe to Completion in LWC (via empApi)
+### Checking Results
 
-```javascript
-// asyncAgentComponent.js
-import { LightningElement, wire } from 'lwc';
-import { subscribe, unsubscribe, MessageContext } from 'lightning/messageService';
-import { subscribe as empSubscribe } from 'lightning/empApi';
-import enqueueCrewAsync from '@salesforce/apex/FC_CrewController.enqueueCrewAsync';
+After enqueuing, query `FC_CrewRun__c` to check status:
 
-const CHANNEL = '/event/FC_CrewEvent__e';
+```apex
+FC_CrewRun__c run = [
+    SELECT Status__c, FinalOutput__c, ErrorMessage__c
+    FROM FC_CrewRun__c
+    WHERE Id = :runId
+];
 
-export default class AsyncAgentComponent extends LightningElement {
-    subscription = null;
-    correlationId = null;
-    result = null;
-
-    async runAsync() {
-        this.correlationId = crypto.randomUUID();
-
-        // Subscribe to the Platform Event first
-        this.subscription = await empSubscribe(CHANNEL, -1, (event) => {
-            const data = event.data.payload;
-            if (data.CorrelationId__c === this.correlationId) {
-                this.result = {
-                    success: data.Success__c,
-                    finalOutput: data.FinalOutput__c,
-                    errorMessage: data.ErrorMessage__c
-                };
-                unsubscribe(this.subscription, () => {});
-            }
-        });
-
-        // Enqueue crew
-        const crewConfigJson = JSON.stringify({ /* ... crew config ... */ });
-        await enqueueCrewAsync({ crewConfigJson, correlationId: this.correlationId });
-    }
+if (run.Status__c == 'Completed') {
+    System.debug(run.FinalOutput__c);
+} else if (run.Status__c == 'Failed') {
+    System.debug(run.ErrorMessage__c);
 }
 ```
 
@@ -1073,7 +1092,7 @@ sf apex run test --class-names FC_CrewTest --synchronous
 | Salesforce API version | 62.0 or higher |
 | Einstein AI features | Must be enabled in your org |
 | Apex governor limits | Models API calls count against org limits |
-| Async crews | FC_CrewRun__c and FC_CrewEvent__e metadata must be created |
+| Async crews | FC_CrewRun__c custom object must be created |
 | Tool serialisation | Async crews require `FC_Tool.fromClassName()` — no inline instances |
 
 ---
@@ -1094,4 +1113,3 @@ MIT License — see [LICENSE](LICENSE) for details.
 ---
 
 *ForceCrew is not affiliated with Salesforce, Inc. or crewAI, Inc. Salesforce, Einstein, and Models API are trademarks of Salesforce, Inc.*
-# ForceCrew

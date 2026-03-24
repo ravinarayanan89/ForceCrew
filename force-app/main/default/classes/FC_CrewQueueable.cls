@@ -25,10 +25,9 @@
  *
  *   Last job
  *     └─▶ Marks FC_CrewRun__c.Status__c = 'Completed'
- *         └─▶ Publishes FC_CrewEvent__e so LWC is notified
  *
  * REQUIRED METADATA:
- *   See setupInstructions() for the FC_CrewRun__c object + FC_CrewEvent__e fields.
+ *   See setupInstructions() for the FC_CrewRun__c object fields.
  *
  * @group ForceCrew
  */
@@ -239,7 +238,6 @@ public class FC_CrewQueueable implements Queueable {
             'Crew "' + config.crewName + '" ' + status
             + (success ? '' : ' — ' + errorMessage));
 
-        publishEvent(config.crewName, config.correlationId, runId, finalOutput, errorMessage, success);
     }
 
     // ─── Record Operations ────────────────────────────────────────────────────
@@ -289,32 +287,6 @@ public class FC_CrewQueueable implements Queueable {
             update run;
         } catch (Exception e) {
             FC_Logger.error('FC_CrewQueueable', 'Failed to update FC_CrewRun__c: ' + e.getMessage());
-        }
-    }
-
-    // ─── Platform Event ───────────────────────────────────────────────────────
-
-    private static void publishEvent(
-        String  crewName,
-        String  correlationId,
-        Id      runId,
-        String  finalOutput,
-        String  errorMessage,
-        Boolean success
-    ) {
-        try {
-            SObject evt = (SObject) Type.forName('FC_CrewEvent__e').newInstance();
-            evt.put('CrewName__c',      crewName);
-            evt.put('CorrelationId__c', correlationId);
-            evt.put('RunId__c',         runId);
-            evt.put('FinalOutput__c',   finalOutput);
-            evt.put('ErrorMessage__c',  errorMessage);
-            evt.put('Success__c',       success);
-            EventBus.publish(evt);
-        } catch (Exception e) {
-            FC_Logger.warn('FC_CrewQueueable',
-                'FC_CrewEvent__e not deployed — skipping event publish. '
-                + 'Run FC_CrewQueueable.setupInstructions() to see required metadata.');
         }
     }
 
@@ -441,20 +413,13 @@ public class FC_CrewQueueable implements Queueable {
             + '   - FinalOutput__c      Long Text Area(32768)   — final crew output\n'
             + '   - ErrorMessage__c     Text(1024)\n'
             + '   - CorrelationId__c    Text(255)\n\n'
-            + '2. Platform Event: FC_CrewEvent__e\n'
-            + '   Fields:\n'
-            + '   - CrewName__c         Text(255)\n'
-            + '   - CorrelationId__c    Text(255)\n'
-            + '   - RunId__c            Text(18)   — Id of FC_CrewRun__c\n'
-            + '   - FinalOutput__c      Long Text Area(32768)\n'
-            + '   - ErrorMessage__c     Text(1024)\n'
-            + '   - Success__c          Checkbox\n\n'
-            + '3. Tool Requirement:\n'
+            + '2. Tool Requirement:\n'
             + '   All tools used in async crews MUST implement FC_IMCPTool\n'
             + '   and be registered via FC_Tool.fromClassName(\'MyToolClass\').\n'
             + '   Tools registered via FC_Tool.from(..., new MyTool()) cannot be\n'
             + '   serialised across jobs.\n\n'
-            + '4. LWC: Subscribe to FC_CrewEvent__e via lightning/empApi\n'
-            + '   to receive real-time completion notifications.';
+            + '3. Checking results:\n'
+            + '   Poll or query FC_CrewRun__c.Status__c to check completion.\n'
+            + '   FinalOutput__c holds the crew result when Status__c = \'Completed\'.';
     }
 }

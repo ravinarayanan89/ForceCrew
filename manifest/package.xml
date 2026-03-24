@@ -42,12 +42,6 @@
         <name>ApexClass</name>
     </types>
     <types>
-        <members>FC_CrewEvent__e.CorrelationId__c</members>
-        <members>FC_CrewEvent__e.CrewName__c</members>
-        <members>FC_CrewEvent__e.ErrorMessage__c</members>
-        <members>FC_CrewEvent__e.FinalOutput__c</members>
-        <members>FC_CrewEvent__e.RunId__c</members>
-        <members>FC_CrewEvent__e.Success__c</members>
         <members>FC_CrewRun__c.CorrelationId__c</members>
         <members>FC_CrewRun__c.CrewConfigJson__c</members>
         <members>FC_CrewRun__c.CrewName__c</members>
@@ -58,7 +52,6 @@
         <name>CustomField</name>
     </types>
     <types>
-        <members>FC_CrewEvent__e</members>
         <members>FC_CrewRun__c</members>
         <name>CustomObject</name>
     </types>
