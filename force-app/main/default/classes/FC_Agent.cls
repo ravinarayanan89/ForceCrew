@@ -180,9 +180,15 @@ public class FC_Agent {
         for (FC_Tool tool : tools) {
             toolDefs.add(tool.toDefinition());
         }
-        return '\n\n## Available Tools\n'
-            + 'You have access to the following tools. Use them to gather information '
-            + 'or perform actions when needed.\n'
+
+        return '\n\n## Execution Environment\n'
+            + 'You are running inside a custom Salesforce Apex agent runtime. '
+            + 'Tool calls are made by returning a JSON TOOL_CALL response — this IS the real, '
+            + 'working mechanism for invoking Salesforce APIs. The tools below are implemented as '
+            + 'Apex classes that execute against a live Salesforce org. There is no other tool-calling '
+            + 'mechanism available. Do NOT say tools are unavailable — they are real and ready.\n\n'
+            + '## Available Tools\n'
+            + 'The following tools are registered and callable in this runtime:\n'
             + JSON.serializePretty(toolDefs);
     }
 
@@ -197,23 +203,25 @@ public class FC_Agent {
                 + '}';
         }
 
-        return '\n\n## Response Format\n'
-            + 'You MUST respond with ONLY a valid JSON object in one of these two formats.\n'
-            + 'Do NOT include markdown code fences or any text outside the JSON.\n\n'
-            + 'To call a tool:\n'
+        return '\n\n## How to Call a Tool\n'
+            + 'To invoke a tool, respond with ONLY this JSON (no prose, no markdown fences):\n'
             + '{\n'
-            + '  "thought": "<your reasoning for calling this tool>",\n'
+            + '  "thought": "<your reasoning — what you are doing and why>",\n'
             + '  "action": "TOOL_CALL",\n'
             + '  "tool": "<exact tool name from the list above>",\n'
             + '  "parameters": { "<param_name>": "<value>" }\n'
-            + '}\n\n'
-            + 'When you have gathered all information needed:\n'
+            + '}\n'
+            + 'The runtime will execute the tool and return a TOOL_RESULT message. Then decide your next step.\n\n'
+            + '## How to Return a Final Answer\n'
+            + 'Once you have gathered all needed data, respond with ONLY this JSON:\n'
             + '{\n'
             + '  "thought": "<your final reasoning>",\n'
             + '  "action": "FINAL_ANSWER",\n'
             + '  "answer": "<your complete, well-formatted response>"\n'
             + '}\n\n'
-            + 'Rules:\n'
+            + '## Rules\n'
+            + '- NEVER output plain text outside JSON. Every response must be valid JSON.\n'
+            + '- NEVER say "I don\'t have access to tools" or "no tools are available" — the tools above ARE available.\n'
             + '- Only use TOOL_CALL when you need data or must perform an action.\n'
             + '- Only use FINAL_ANSWER when you have everything needed to answer fully.\n'
             + '- Tool names must exactly match one of the names in the Available Tools section.\n'

@@ -145,7 +145,10 @@ public with sharing class FC_AgentExecutorStep {
 
             // ── Dispatch ──────────────────────────────────────────────────────
             if (action == 'FINAL_ANSWER') {
-                String answer = (String) parsed.get('answer');
+                Object answerRaw = parsed.get('answer');
+                String answer = answerRaw instanceof String
+                    ? (String) answerRaw
+                    : (answerRaw != null ? JSON.serialize(answerRaw) : null);
                 if (String.isBlank(answer)) {
                     history.add(FC_ChatMessage.user(
                         'Error: FINAL_ANSWER must include a non-empty "answer" field.'
@@ -179,7 +182,7 @@ public with sharing class FC_AgentExecutorStep {
                 String toolResult = executeTool(toolName, toolParams);
 
                 history.add(FC_ChatMessage.user(
-                    'Tool "' + toolName + '" returned:\n' + toolResult
+                    'TOOL_RESULT for "' + toolName + '":\n' + toolResult
                 ));
                 request.setHistory(history);
                 request.lastStepJson = JSON.serialize(

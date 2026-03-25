@@ -1,4 +1,4 @@
-# ForceCrew
+# 🤖 ForceCrew
 
 **crewAI for Salesforce — Native multi-agent AI orchestration in Apex**
 
@@ -16,7 +16,7 @@ System.debug(result.finalOutput);
 
 ---
 
-## Table of Contents
+## 📋 Table of Contents
 
 1. [Why ForceCrew](#why-forcecrew)
 2. [Architecture Overview](#architecture-overview)
@@ -46,7 +46,7 @@ System.debug(result.finalOutput);
 
 ---
 
-## Why ForceCrew
+## 🎯 Why ForceCrew
 
 Salesforce's native Models API gives you access to powerful LLMs but leaves the agentic layer entirely up to you. ForceCrew fills that gap with a production-ready framework that mirrors crewAI's mental model so Salesforce developers can build multi-agent solutions without reinventing the wheel.
 
@@ -61,15 +61,15 @@ Salesforce's native Models API gives you access to powerful LLMs but leaves the 
 
 **Key advantages:**
 
-- **100% native** — runs entirely inside your Salesforce org using `aiplatform.ModelsAPI`
-- **No external dependencies** — no Named Credentials, no Remote Site Settings, no secrets to manage
-- **Governor-limit aware** — step-by-step execution mode lets LWC drive the loop across transactions
-- **Production patterns** — Builder constructors, typed exceptions, structured logging, async Queueable chaining
-- **LWC-ready** — AuraEnabled controller with serialisable DTOs for real-time UI integration
+- 🏠 **100% native** — runs entirely inside your Salesforce org using `aiplatform.ModelsAPI`
+- 🔒 **No external dependencies** — no Named Credentials, no Remote Site Settings, no secrets to manage
+- ⚡ **Governor-limit aware** — step-by-step execution mode lets LWC drive the loop across transactions
+- 🏗️ **Production patterns** — Builder constructors, typed exceptions, structured logging, async Queueable chaining
+- 🖥️ **LWC-ready** — AuraEnabled controller with serialisable DTOs for real-time UI integration
 
 ---
 
-## Architecture Overview
+## 🏛️ Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -114,7 +114,7 @@ Salesforce's native Models API gives you access to powerful LLMs but leaves the 
     └───────────────────┘       └──────────────────────┘
 ```
 
-### ReAct Loop (How Agents Think)
+### 🧠 ReAct Loop (How Agents Think)
 
 Each agent runs a **Reason + Act** loop until it has a final answer:
 
@@ -139,15 +139,15 @@ System Prompt (role + tools schema)
 
 ---
 
-## Installation
+## 🚀 Installation
 
-### Prerequisites
+### ✅ Prerequisites
 
-- Salesforce DX CLI `sf` or `sfdx`)
+- Salesforce DX CLI (`sf` or `sfdx`)
 - Salesforce org with **Einstein AI features enabled** (required for `aiplatform.ModelsAPI`)
 - API version **62.0 or higher**
 
-### Deploy to Scratch Org
+### 🧪 Deploy to Scratch Org
 
 ```bash
 # Clone the repository
@@ -163,7 +163,7 @@ sf project deploy start
 sf apex run test --synchronous --result-format human
 ```
 
-### Deploy to Sandbox / Production
+### 🌐 Deploy to Sandbox / Production
 
 ```bash
 # Authenticate
@@ -172,7 +172,7 @@ sf org login web --alias my-sandbox
 sf project deploy start --target-org my-sandbox
 ```
 
-### FC_CrewRun__c Custom Object (for Backend Async Only)
+### 🗄️ FC_CrewRun__c Custom Object (for Backend Async Only)
 
 Only needed if you use `FC_CrewQueueable` from a **trigger, scheduled job, or batch process**. Not required for LWC — use the [Step-by-Step pattern](#step-by-step-lwc--recommended-for-complex-tasks) instead.
 
@@ -180,9 +180,9 @@ Only needed if you use `FC_CrewQueueable` from a **trigger, scheduled job, or ba
 
 ---
 
-## Core Concepts
+## 🧩 Core Concepts
 
-### Crew
+### 👥 Crew
 
 A **Crew** is the top-level container. It holds agents, tasks, and the execution strategy. Think of it as the team manager that coordinates everyone.
 
@@ -201,7 +201,7 @@ FC_CrewResult result = crew.kickoff();
 FC_CrewResult result = crew.kickoff(new Map<String, Object>{ 'quarter' => 'Q1 2025' });
 ```
 
-### Agent
+### 🤖 Agent
 
 An **Agent** is an AI persona with a role, goal, backstory, and a set of tools. The role must be unique within a crew.
 
@@ -216,7 +216,7 @@ FC_Agent analyst = new FC_Agent.Builder('Data Analyst')
     .build();
 ```
 
-### Task
+### 📋 Task
 
 A **Task** is a unit of work. Tasks can be chained so that later tasks receive the output of earlier ones as context.
 
@@ -236,7 +236,7 @@ FC_Task summaryTask = new FC_Task.Builder('Write Summary')
 
 If a task is not assigned to an agent, ForceCrew assigns it to the first available agent in sequential mode, or lets the manager agent decide in hierarchical mode.
 
-### Tool
+### 🔧 Tool
 
 A **Tool** is a callable function the agent can invoke. ForceCrew supports three styles:
 
@@ -287,7 +287,7 @@ FC_Tool tool = FC_Tool.fromClassName('MyAccountTool');
 
 ---
 
-## Choosing Your LLM Model
+## 🧠 Choosing Your LLM Model
 
 All model identifiers are defined as constants on `FC_ModelsAPIService`. Always reference these constants — never hard-code the raw string.
 
@@ -309,7 +309,7 @@ All constants live on `FC_ModelsAPIService`. Use `MODEL_DEFAULT` when you want t
 
 See the [API Reference](#api-reference) for the full constant list.
 
-### Set model per agent
+### 🤖 Set model per agent
 
 Use `.llmModel()` on `FC_Agent.Builder`. Each agent in a crew can use a different model.
 
@@ -326,7 +326,7 @@ FC_Agent summariser = new FC_Agent.Builder('Summariser')
 
 If `.llmModel()` is not called, the agent defaults to `MODEL_DEFAULT` (`MODEL_CLAUDE_OPUS45`).
 
-### Set model for the manager (hierarchical mode)
+### 👔 Set model for the manager (hierarchical mode)
 
 In hierarchical mode the manager agent is created internally by ForceCrew. Set its model via `.managerLlmModel()` on `FC_Crew.Builder`.
 
@@ -344,11 +344,153 @@ new FC_Crew.Builder('My Hierarchical Crew')
 
 If `.managerLlmModel()` is not called, the manager also defaults to `MODEL_DEFAULT` (`MODEL_CLAUDE_OPUS45`).
 
+### 🌐 Multi-LLM Crew — End-to-End Example
+
+A real Salesforce use case: a prospect in **Negotiation/Review** stage has sent an email asking for a better price on a bulk car order. Three agents — each on a different LLM — handle data retrieval, discount math, and email drafting in a single crew run.
+
+**Records in Salesforce:**
+- 🏢 Account: *Premier Auto Wholesale* — regional fleet vehicle distributor
+- 💰 Opportunity: *Q2 Fleet Purchase — Mercedes Sprinter x40* — $1,200,000, Stage: Negotiation/Review
+- 📧 Last Email (Task): buyer asking to bring price down to $1,050,000 ($26,250/unit), open to a 3-year service contract
+
+> 💡 **No custom tools needed** — Claude writes the SOQL queries itself using `FC_SampleSOQLTool`.
+
+```apex
+FC_Tool soqlTool = FC_Tool.fromMCP(new FC_SampleSOQLTool());
+
+FC_CrewResult result = new FC_Crew.Builder('Car Wholesaler Deal Intelligence')
+    .process(FC_Process.Type.SEQUENTIAL)
+
+    // 🔵 Agent 1: Claude Opus — reads account, opportunity, contact, and last email via SOQL
+    .agent(new FC_Agent.Builder('Deal Data Agent')
+        .goal('Retrieve all relevant deal context from Salesforce using SOQL queries.')
+        .backstory('Salesforce CRM specialist who knows exactly which objects and fields to query.')
+        .tool(soqlTool)
+        .llmModel(FC_ModelsAPIService.MODEL_CLAUDE_OPUS45)
+        .build())
+
+    // 🟢 Agent 2: GPT-4o — calculates the optimal counter-offer and walking points
+    .agent(new FC_Agent.Builder('Discount Analyst')
+        .goal('Calculate the optimal discount response to the buyer counter-offer.')
+        .backstory('Pricing strategist specialising in wholesale automotive deal structuring and margin protection.')
+        .llmModel(FC_ModelsAPIService.MODEL_GPT4O)
+        .build())
+
+    // 🟡 Agent 3: Gemini Flash — drafts the reply email
+    .agent(new FC_Agent.Builder('Email Composer')
+        .goal('Write a professional, persuasive reply email that closes the deal.')
+        .backstory('Senior sales communications specialist who crafts warm emails that close deals.')
+        .llmModel(FC_ModelsAPIService.MODEL_GEMINI25_FLASH)
+        .build())
+
+    .task(new FC_Task.Builder('Gather Deal Context')
+        .description(
+            'Query Salesforce for Premier Auto Wholesale. Run these one by one:\n'
+            + '1. Account: SELECT Id, Name, Industry, Type, Phone FROM Account WHERE Name = \'Premier Auto Wholesale\'\n'
+            + '2. Opportunity: SELECT Name, StageName, Amount, CloseDate, Description FROM Opportunity WHERE AccountId IN (SELECT Id FROM Account WHERE Name = \'Premier Auto Wholesale\') AND IsClosed = false\n'
+            + '3. Contact: SELECT FirstName, LastName, Title, Email FROM Contact WHERE AccountId IN (SELECT Id FROM Account WHERE Name = \'Premier Auto Wholesale\')\n'
+            + '4. Last email: SELECT Subject, Description, ActivityDate FROM Task WHERE WhatId IN (SELECT Id FROM Opportunity WHERE AccountId IN (SELECT Id FROM Account WHERE Name = \'Premier Auto Wholesale\')) ORDER BY ActivityDate DESC LIMIT 1\n'
+            + 'Summarise all results clearly.'
+        )
+        .expectedOutput('Structured summary: account profile, opportunity details, contact, and full last email body.')
+        .assignToAgent('Deal Data Agent')
+        .build())
+
+    .task(new FC_Task.Builder('Calculate Discount Strategy')
+        .description(
+            'Analyse the deal financials:\n'
+            + '- Quote: $1,200,000 for 40 units = $30,000/unit\n'
+            + '- Buyer counter: $1,050,000 = $26,250/unit\n'
+            + '- Competitor Ford Transit: $28,500/unit\n'
+            + '- Buyer open to 3-year extended service contract\n'
+            + 'Produce: gap analysis ($/%),  counter-proposal (unit price + total + service contract framing), walk-away line, and 2-3 negotiation talking points.'
+        )
+        .expectedOutput('Counter-offer price, total, service contract framing, walk-away line, talking points.')
+        .assignToAgent('Discount Analyst')
+        .withContext('Gather Deal Context')
+        .build())
+
+    .task(new FC_Task.Builder('Compose Reply Email')
+        .description(
+            'Write a reply email from Sarah (Account Executive) to James Hargrove that:\n'
+            + '- Acknowledges his budget constraint with empathy\n'
+            + '- Presents the counter-offer price clearly\n'
+            + '- Frames the 3-year service contract as added value\n'
+            + '- Reinforces Sprinter advantages over Ford Transit\n'
+            + '- Creates urgency around the end-of-month deadline\n'
+            + '- Ends with a clear call to action\n'
+            + 'Under 200 words. Warm and confident.'
+        )
+        .expectedOutput('Complete professional reply email, ready to send.')
+        .assignToAgent('Email Composer')
+        .withContext('Gather Deal Context')
+        .withContext('Calculate Discount Strategy')
+        .build())
+
+    .verbose(false)
+    .build()
+    .kickoff();
+
+System.debug(result.taskResults[0].output);  // Claude Opus  → deal context summary
+System.debug(result.taskResults[1].output);  // GPT-4o       → discount strategy
+System.debug(result.taskResults[2].output);  // Gemini Flash  → reply email
+```
+
+**Actual output from a live run:**
+
+*🔵 Task 1 — Claude Opus 4.5 (4 SOQL queries, live Salesforce data):*
+```
+Account: Premier Auto Wholesale | Industry: Transportation | Type: Customer
+Opportunity: Q2 Fleet Purchase - Mercedes Sprinter x40
+  Stage: Negotiation/Review | Amount: $1,200,000 | Close: Apr 22, 2026
+Contact: James Hargrove, Fleet Procurement Manager (j.hargrove@premierauto.com)
+Last Email (RE: Q2 Fleet Quote - Pricing Concern):
+  "Our board approved max $1,050,000 ($26,250/unit). Open to 3-year service
+   contract if that helps. Must place order by end of month."
+Key insight: $150,000 gap (12.5%). Competitor Ford Transit at $28,500/unit.
+```
+
+*🟢 Task 2 — GPT-4o (discount math):*
+```
+Gap analysis   : $150,000 requested (12.5% discount)
+Counter-proposal: $28,500/unit → $1,140,000 total
+                  + 3-year extended service contract at no additional cost
+Walk-away line : $27,500/unit → $1,100,000 minimum
+Talking points :
+  • Matches competitor price while including service contract value
+  • Sprinter's lower total cost of ownership over fleet lifecycle
+  • Long-term partnership framing — structured to align with their budget
+```
+
+*🟡 Task 3 — Gemini 2.5 Flash (email, ready to send):*
+```
+Subject: Re: Q2 Fleet Quote - Pricing Concern
+
+Hi James,
+
+Thanks for sharing your budget considerations. To meet your needs while
+delivering the quality of the Mercedes Sprinter, we're pleased to offer
+the 40 units at $28,500/unit — $1,140,000 total — with a 3-year extended
+service contract included at no additional cost.
+
+This matches the Ford Transit pricing while giving you Sprinter's proven
+reliability and significantly lower total cost of ownership. It's a smarter
+long-term investment for Premier Auto Wholesale.
+
+With the end-of-month deadline approaching, I'd love to get this locked in
+for you. Are you available for a quick call tomorrow to finalise?
+
+Best regards,
+Sarah | Account Executive
+```
+
+> ✅ **3 agents, 3 LLMs, 1 standard SOQL tool, 40 seconds.** No custom code needed beyond the crew definition.
+
 ---
 
-## Quick Start
+## ⚡ Quick Start
 
-### Single Agent, One Task
+### 🔹 Single Agent, One Task
 
 ```apex
 // The simplest possible usage — one agent, one task
@@ -363,7 +505,7 @@ String answer = ForceCrew.runAgent(
 System.debug(answer);
 ```
 
-### Two Agents, Two Tasks (Sequential)
+### 🔹 Two Agents, Two Tasks (Sequential)
 
 ```apex
 FC_Agent analyst = new FC_Agent.Builder('Analyst')
@@ -401,9 +543,9 @@ if (result.success) {
 
 ---
 
-## Execution Modes
+## ⚙️ Execution Modes
 
-### Sequential Mode
+### 🔁 Sequential Mode
 
 Tasks execute in **declaration order**. Each task's output is available as context to all subsequent tasks that declare it via `.withContext()`.
 
@@ -421,7 +563,7 @@ new FC_Crew.Builder('My Sequential Crew')
     .build();
 ```
 
-### Hierarchical Mode
+### 🏗️ Hierarchical Mode
 
 A **Manager Agent** (an LLM) dynamically decides which agent executes which task and in what order. The manager issues `DELEGATE` directives and adapts based on intermediate results.
 
@@ -457,9 +599,9 @@ The manager uses this JSON protocol internally:
 
 ---
 
-## Calling from Apex
+## 🔷 Calling from Apex
 
-### Synchronous (Full Transaction)
+### ⚡ Synchronous (Full Transaction)
 
 ```apex
 // Standard crew execution
@@ -488,7 +630,7 @@ for (FC_TaskResult tr : result.taskResults) {
 }
 ```
 
-### Reading Logs After Execution
+### 📜 Reading Logs After Execution
 
 ```apex
 // Get all log entries
@@ -502,11 +644,11 @@ System.debug(logDump);
 
 ---
 
-## Calling from LWC
+## 🖥️ Calling from LWC
 
 ForceCrew provides `FC_CrewController` — an `@AuraEnabled` Apex controller with two integration patterns.
 
-### Choosing the Right LWC Pattern
+### 🗺️ Choosing the Right LWC Pattern
 
 | Scenario | Recommended Pattern |
 |---|---|
@@ -517,7 +659,7 @@ ForceCrew provides `FC_CrewController` — an `@AuraEnabled` Apex controller wit
 
 > **Why not Platform Events for LWC?** Platform Events are capped at **250,000 deliveries/day org-wide**. For a framework used frequently across multiple users or automations, this limit is hit quickly. The step-by-step pattern uses plain `@AuraEnabled` calls with no event consumption and is the preferred approach for all LWC integrations.
 
-### Full Transaction (LWC)
+### ⚡ Full Transaction (LWC)
 
 **Best for:** Short tasks that complete within a single Apex transaction (≤ 3 LLM calls expected).
 
@@ -604,7 +746,7 @@ export default class MyAgentComponent extends LightningElement {
 }
 ```
 
-### Step-by-Step (LWC) — Recommended for Complex Tasks
+### 🔄 Step-by-Step (LWC) — Recommended for Complex Tasks
 
 **Best for:** Multi-agent crews, tasks with many tool calls, or any ReAct loop that might exceed governor limits in a single transaction.
 
@@ -716,13 +858,13 @@ async runMultiAgentCrew() {
 
 ---
 
-## Async Execution (Queueable)
+## ⏳ Async Execution (Queueable)
 
 **Use this for backend-only flows** — triggers, scheduled jobs, or batch processes where there is no UI waiting for a result. The crew runs in a Queueable chain and writes its result back to `FC_CrewRun__c` when complete. Query that record to check status or read the output.
 
 > For LWC integrations, use the [Step-by-Step pattern](#step-by-step-lwc--recommended-for-complex-tasks) instead.
 
-### Setup
+### 🛠️ Setup
 
 Create the **FC_CrewRun__c** custom object:
 
@@ -736,7 +878,7 @@ Create the **FC_CrewRun__c** custom object:
 | `ErrorMessage__c` | Text | 1,024 |
 | `CorrelationId__c` | Text | 255 |
 
-### Enqueue a Crew
+### 📤 Enqueue a Crew
 
 ```apex
 FC_Crew crew = new FC_Crew.Builder('Background Analysis')
@@ -756,7 +898,7 @@ Id runId = FC_CrewQueueable.enqueue(crew, new Map<String, Object>(), 'my-correla
 
 > **Important:** Tools in async crews must be registered via `FC_Tool.fromClassName('ClassName')`. Tools registered with `FC_Tool.from(name, desc, new MyTool())` hold object references that cannot be serialised across Queueable jobs.
 
-### Checking Results
+### 📊 Checking Results
 
 After enqueuing, query `FC_CrewRun__c` to check status:
 
@@ -775,9 +917,9 @@ if (run.Status__c == 'Completed') {
 
 ---
 
-## Building Custom Tools
+## 🔧 Building Custom Tools
 
-### Implementing FC_IMCPTool (Recommended)
+### ✅ Implementing FC_IMCPTool (Recommended)
 
 ```apex
 public class SalesforceMetricsTool implements FC_IMCPTool {
@@ -832,7 +974,7 @@ public class SalesforceMetricsTool implements FC_IMCPTool {
 }
 ```
 
-### Registering Tools
+### 📎 Registering Tools
 
 ```apex
 // Option A: fromMCP (synchronous crews only — holds object reference)
@@ -848,7 +990,7 @@ FC_Tool tool = FC_Tool.from(
 );
 ```
 
-### Tool Return Contract
+### 📜 Tool Return Contract
 
 All tools **must** return a JSON string. The `"success"` key is required:
 
@@ -869,7 +1011,7 @@ ForceCrew wraps `FC_Tool.execute()` in a try-catch, so uncaught exceptions are a
 
 ---
 
-## Logging & Observability
+## 🔍 Logging & Observability
 
 FC_Logger provides an in-memory structured log buffer across an entire crew execution.
 
@@ -900,7 +1042,7 @@ Logs are also included in the `CrewResultDTO.logs` array returned to LWC.
 
 ---
 
-## Error Handling
+## 🚨 Error Handling
 
 ForceCrew uses a typed exception hierarchy so you can handle specific failure modes:
 
@@ -944,9 +1086,9 @@ When `failFast = false` (set on the Crew builder), individual task failures are 
 
 ---
 
-## API Reference
+## 📚 API Reference
 
-### FC_Crew.Builder
+### 👥 FC_Crew.Builder
 
 | Method | Description |
 |--------|-------------|
@@ -961,7 +1103,7 @@ When `failFast = false` (set on the Crew builder), individual task failures are 
 | `.managerLlmModel(String)` | LLM for manager in hierarchical mode. |
 | `.build()` | Validate configuration and return `FC_Crew`. |
 
-### FC_Agent.Builder
+### 🤖 FC_Agent.Builder
 
 | Method | Description |
 |--------|-------------|
@@ -976,7 +1118,7 @@ When `failFast = false` (set on the Crew builder), individual task failures are 
 | `.llmModel(String)` | Override default LLM model. |
 | `.build()` | Return `FC_Agent`. |
 
-### FC_Task.Builder
+### 📋 FC_Task.Builder
 
 | Method | Description |
 |--------|-------------|
@@ -988,7 +1130,7 @@ When `failFast = false` (set on the Crew builder), individual task failures are 
 | `.withContextFrom(List<String>)` | Receive outputs from multiple prior tasks. |
 | `.build()` | Return `FC_Task`. |
 
-### FC_ToolParameter.Builder
+### 🔧 FC_ToolParameter.Builder
 
 | Method | Description |
 |--------|-------------|
@@ -1000,7 +1142,7 @@ When `failFast = false` (set on the Crew builder), individual task failures are 
 
 **Type constants:** `TYPE_STRING`, `TYPE_INTEGER`, `TYPE_NUMBER`, `TYPE_BOOLEAN`, `TYPE_ARRAY`, `TYPE_OBJECT`
 
-### FC_ModelsAPIService Model Constants
+### 🧠 FC_ModelsAPIService Model Constants
 
 `MODEL_DEFAULT` points to `MODEL_CLAUDE_OPUS45` and is used when no model is explicitly set.
 
@@ -1043,7 +1185,7 @@ When `failFast = false` (set on the Crew builder), individual task failures are 
 | `MODEL_NOVA_PRO` | `sfdc_ai__DefaultBedrockAmazonNovaPro` |
 | `MODEL_NOVA_LITE` | `sfdc_ai__DefaultBedrockAmazonNovaLite` |
 
-### FC_CrewController @AuraEnabled Methods
+### 🖥️ FC_CrewController @AuraEnabled Methods
 
 | Method | Description |
 |--------|-------------|
@@ -1056,7 +1198,7 @@ When `failFast = false` (set on the Crew builder), individual task failures are 
 
 ---
 
-## Class Inventory
+## 📦 Class Inventory
 
 | Class | Category | Description |
 |-------|----------|-------------|
@@ -1089,7 +1231,7 @@ When `failFast = false` (set on the Crew builder), individual task failures are 
 
 ---
 
-## Testing
+## 🧪 Testing
 
 ForceCrew ships with 19 test classes covering all framework components.
 
@@ -1119,7 +1261,7 @@ sf apex run test --class-names FC_CrewTest --synchronous
 
 ---
 
-## Requirements
+## 📋 Requirements
 
 | Requirement | Detail |
 |-------------|--------|
@@ -1131,7 +1273,7 @@ sf apex run test --class-names FC_CrewTest --synchronous
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repo and create a feature branch
 2. Add test coverage for any new public methods
@@ -1140,7 +1282,7 @@ sf apex run test --class-names FC_CrewTest --synchronous
 
 ---
 
-## License
+## 📄 License
 
 MIT License — see [LICENSE](LICENSE) for details.
 
