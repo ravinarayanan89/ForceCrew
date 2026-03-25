@@ -5,25 +5,72 @@
  * No Named Credentials or HTTP callouts are required — this uses the built-in
  * Salesforce LLM platform service available in Einstein-enabled orgs.
  *
- * Default model: sfdc_ai__DefaultGPT4Omni
+ * Default model: sfdc_ai__DefaultBedrockAnthropicClaude45Opus (MODEL_DEFAULT)
  * Override via constructor or FC_Agent.Builder.llmModel().
  *
  * @group ForceCrew
  */
 public with sharing class FC_ModelsAPIService {
 
-    public static final String MODEL_GPT4O       = 'sfdc_ai__DefaultGPT4Omni';
-    public static final String MODEL_GPT4O_MINI  = 'sfdc_ai__DefaultGPT4OmniMini';
-    public static final String MODEL_CLAUDE      = 'sfdc_ai__DefaultClaude';
+    // ── OpenAI GPT (Geo-aware) ───────────────────────────────────────────────
+    public static final String MODEL_GPT4O            = 'sfdc_ai__DefaultGPT4Omni';
+    public static final String MODEL_GPT4O_MINI       = 'sfdc_ai__DefaultGPT4OmniMini';
+    public static final String MODEL_GPT41             = 'sfdc_ai__DefaultGPT41';
+    public static final String MODEL_GPT41_MINI        = 'sfdc_ai__DefaultGPT41Mini';
+    public static final String MODEL_GPT5              = 'sfdc_ai__DefaultGPT5';
+    public static final String MODEL_GPT5_MINI         = 'sfdc_ai__DefaultGPT5Mini';
+    public static final String MODEL_O3                = 'sfdc_ai__DefaultO3';
+    public static final String MODEL_O4_MINI           = 'sfdc_ai__DefaultO4Mini';
+
+    // ── Anthropic Claude on Amazon Bedrock (Trust Boundary) ─────────────────
+    public static final String MODEL_CLAUDE_SONNET45   = 'sfdc_ai__DefaultBedrockAnthropicClaude45Sonnet';
+    public static final String MODEL_CLAUDE_SONNET4    = 'sfdc_ai__DefaultBedrockAnthropicClaude4Sonnet';
+    public static final String MODEL_CLAUDE_OPUS45     = 'sfdc_ai__DefaultBedrockAnthropicClaude45Opus';
+    public static final String MODEL_CLAUDE_HAIKU45    = 'sfdc_ai__DefaultBedrockAnthropicClaude45Haiku';
+
+    // ── Google Gemini on Vertex AI ───────────────────────────────────────────
+    public static final String MODEL_GEMINI3_PRO       = 'sfdc_ai__DefaultVertexAIGeminiPro30';
+    public static final String MODEL_GEMINI3_FLASH     = 'sfdc_ai__DefaultVertexAIGemini30Flash';
+    public static final String MODEL_GEMINI25_PRO      = 'sfdc_ai__DefaultVertexAIGeminiPro25';
+    public static final String MODEL_GEMINI25_FLASH    = 'sfdc_ai__DefaultVertexAIGemini25Flash001';
+    public static final String MODEL_GEMINI25_FLASH_LITE = 'sfdc_ai__DefaultVertexAIGemini25FlashLite001';
+
+    // ── Amazon Nova on Bedrock ───────────────────────────────────────────────
+    public static final String MODEL_NOVA_PRO          = 'sfdc_ai__DefaultBedrockAmazonNovaPro';
+    public static final String MODEL_NOVA_LITE         = 'sfdc_ai__DefaultBedrockAmazonNovaLite';
+
+    // ── Default ──────────────────────────────────────────────────────────────
+    public static final String MODEL_DEFAULT           = MODEL_CLAUDE_OPUS45;
+
+    // ─── Test Seam ────────────────────────────────────────────────────────────
+    // Queued mock responses consumed by chat() during @IsTest execution.
+    // Tests call enqueueMock() / enqueueMockFailure() before triggering LLM calls.
+
+    @TestVisible private static List<ChatResponse> mockResponses = new List<ChatResponse>();
+
+    @TestVisible
+    private static void enqueueMock(String content) {
+        mockResponses.add(chatOk(content, 'mock-' + mockResponses.size()));
+    }
+
+    @TestVisible
+    private static void enqueueMockFailure(String error) {
+        mockResponses.add(chatFailure(error));
+    }
+
+    @TestVisible
+    private static void clearMocks() {
+        mockResponses.clear();
+    }
 
     private String model;
 
     public FC_ModelsAPIService() {
-        this.model = MODEL_GPT4O;
+        this.model = MODEL_DEFAULT;
     }
 
     public FC_ModelsAPIService(String model) {
-        this.model = String.isNotBlank(model) ? model : MODEL_GPT4O;
+        this.model = String.isNotBlank(model) ? model : MODEL_DEFAULT;
     }
 
     // ─── Chat ─────────────────────────────────────────────────────────────────
@@ -37,6 +84,11 @@ public with sharing class FC_ModelsAPIService {
     public ChatResponse chat(List<FC_ChatMessage> messages) {
         if (messages == null || messages.isEmpty()) {
             return chatFailure('No messages provided to the LLM');
+        }
+
+        // Test seam: return next queued mock instead of calling the real API
+        if (Test.isRunningTest() && !mockResponses.isEmpty()) {
+            return mockResponses.remove(0);
         }
 
         try {

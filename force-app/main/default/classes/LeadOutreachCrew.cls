@@ -32,7 +32,7 @@ public with sharing class LeadOutreachCrew {
 
         private Result() {}
 
-        public static Result ok(FC_CrewResult crewResult) {
+        public Result ok(FC_CrewResult crewResult) {
             Result r = new Result();
             r.success = true;
             // Task results in order: Research → Score → Email
@@ -42,7 +42,7 @@ public with sharing class LeadOutreachCrew {
             return r;
         }
 
-        public static Result error(String msg) {
+        public Result error(String msg) {
             Result r = new Result();
             r.success      = false;
             r.errorMessage = msg;
@@ -60,8 +60,8 @@ public with sharing class LeadOutreachCrew {
      * @return        Result with researchSummary, scoringReport, and email
      */
     public static Result run(Id leadId) {
-        if (leadId == null) {
-            return Result.error('leadId is required');
+            if (leadId == null) {
+            return new Result().error('leadId is required');
         }
 
         // ── Tools (existing built-in ForceCrew tools) ─────────────────────────
@@ -205,13 +205,13 @@ public with sharing class LeadOutreachCrew {
                 .kickoff();
 
             if (crewResult.success) {
-                return Result.ok(crewResult);
+                return new Result().ok(crewResult);
             } else {
-                return Result.error(crewResult.errorMessage);
+                return new Result().error(crewResult.errorMessage);
             }
 
         } catch (Exception e) {
-            return Result.error('Crew execution failed: ' + e.getMessage());
+            return new Result().error('Crew execution failed: ' + e.getMessage());
         }
     }
 }

@@ -148,4 +148,173 @@ public class FC_AgentExecutorStepTest {
         Assert.areEqual(originalHistory[0].role,    restoredHistory[0].role);
         Assert.areEqual(originalHistory[0].content, restoredHistory[0].content);
     }
+
+    // ─── Step — LLM error handling ──────────────────────────────────────────
+
+    @IsTest
+    static void testStepLLMErrorSetsErrorMessage() {
+        FC_ModelsAPIService.clearMocks();
+        FC_ModelsAPIService.enqueueMockFailure('LLM went wrong');
+
+        FC_AgentExecutorStep executor = new FC_AgentExecutorStep(buildAgent());
+        FC_Task task = buildTask();
+        FC_StepRequest req = executor.initialise(task, null);
+
+        FC_StepRequest result = executor.step(req);
+        Assert.isNotNull(result.errorMessage);
+        Assert.isTrue(result.errorMessage.contains('LLM error: LLM went wrong'));
+        Assert.isFalse(result.isComplete);
+    }
+
+    // ─── Step — JSON parsing ───────────────────────────────────────────────
+
+    @IsTest
+    static void testStepInvalidJsonResponseSetsErrorStep() {
+        FC_ModelsAPIService.clearMocks();
+        // Not JSON object (it's an array) so parseJsonResponse returns null.
+        FC_ModelsAPIService.enqueueMock('[]');
+
+        FC_AgentExecutorStep executor = new FC_AgentExecutorStep(buildAgent());
+        FC_StepRequest req = executor.initialise(buildTask(), null);
+
+        FC_StepRequest result = executor.step(req);
+        Assert.isNotNull(result.lastStepJson);
+        Assert.isTrue(result.lastStepJson.contains('Invalid JSON response'));
+
+        // History should have assistant turn + a corrective user turn.
+        List<FC_ChatMessage> history = result.getHistory();
+        Assert.isTrue(history.size() >= 4);
+        Assert.areEqual('assistant', history[2].role);
+        Assert.isTrue(history[2].content.contains('[]'));
+    }
+
+    @IsTest
+    static void testStepParsesMarkdownFencedJsonFinalAnswer() {
+        FC_ModelsAPIService.clearMocks();
+        String fenced = '```json\n'
+            + '{"thought":"t","action":"FINAL_ANSWER","answer":"Done"}'
+            + '\n```';
+        FC_ModelsAPIService.enqueueMock(fenced);
+
+        FC_AgentExecutorStep executor = new FC_AgentExecutorStep(buildAgent());
+        FC_StepRequest req = executor.initialise(buildTask(), null);
+
+        FC_StepRequest result = executor.step(req);
+        Assert.isTrue(result.isComplete);
+        Assert.areEqual('Done', result.finalAnswer);
+        Assert.isNotNull(result.lastStepJson);
+        Assert.isTrue(result.lastStepJson.contains('FINAL_ANSWER'));
+    }
+
+    // ─── Step — Validation failures for required fields ────────────────────
+
+    @IsTest
+    static void testStepFinalAnswerWithBlankAnswerDoesNotComplete() {
+        FC_ModelsAPIService.clearMocks();
+        FC_ModelsAPIService.enqueueMock(
+            '{"thought":"t","action":"FINAL_ANSWER","answer":"   "}'
+        );
+
+        FC_AgentExecutorStep executor = new FC_AgentExecutorStep(buildAgent());
+        FC_StepRequest req = executor.initialise(buildTask(), null);
+
+        FC_StepRequest result = executor.step(req);
+        Assert.isFalse(result.isComplete);
+        Assert.isNull(result.lastStepJson);
+        List<FC_ChatMessage> history = result.getHistory();
+        Assert.isTrue(
+            history[history.size() - 1].content.contains('FINAL_ANSWER must include a non-empty')
+        );
+    }
+
+    @IsTest
+    static void testStepToolCallWithBlankToolDoesNotSetLastStep() {
+        FC_ModelsAPIService.clearMocks();
+        FC_ModelsAPIService.enqueueMock(
+            '{"thought":"t","action":"TOOL_CALL","tool":"   ","parameters":{}}'
+        );
+
+        FC_AgentExecutorStep executor = new FC_AgentExecutorStep(buildAgent());
+        FC_StepRequest req = executor.initialise(buildTask(), null);
+
+        FC_StepRequest result = executor.step(req);
+        Assert.isFalse(result.isComplete);
+        Assert.isNull(result.lastStepJson);
+
+        List<FC_ChatMessage> history = result.getHistory();
+        Assert.isTrue(
+            history[history.size() - 1].content.contains('TOOL_CALL must include a non-empty "tool"')
+        );
+    }
+
+    @IsTest
+    static void testStepUnknownActionAddsErrorToHistory() {
+        FC_ModelsAPIService.clearMocks();
+        FC_ModelsAPIService.enqueueMock(
+            '{"thought":"t","action":"SOMETHING_ELSE"}'
+        );
+
+        FC_AgentExecutorStep executor = new FC_AgentExecutorStep(buildAgent());
+        FC_StepRequest req = executor.initialise(buildTask(), null);
+
+        FC_StepRequest result = executor.step(req);
+        Assert.isFalse(result.isComplete);
+        Assert.isNull(result.lastStepJson);
+
+        List<FC_ChatMessage> history = result.getHistory();
+        Assert.isTrue(
+            history[history.size() - 1].content.contains('Error: Unknown action')
+        );
+    }
+
+    // ─── Step — Tool dispatch ──────────────────────────────────────────────
+
+    @IsTest
+    static void testStepToolCallExecutesToolAndCreatesToolCallStep() {
+        FC_ModelsAPIService.clearMocks();
+        FC_ModelsAPIService.enqueueMock(
+            '{"thought":"t","action":"TOOL_CALL","tool":"QueryRecords",'
+                + '"parameters":{"query":"SELECT Id FROM Account LIMIT 1"}}'
+        );
+
+        FC_AgentExecutorStep executor = new FC_AgentExecutorStep(buildAgent());
+        FC_StepRequest req = executor.initialise(buildTask(), null);
+
+        FC_StepRequest result = executor.step(req);
+        Assert.isFalse(result.isComplete);
+        Assert.isNotNull(result.lastStepJson);
+
+        Map<String, Object> parsed =
+            (Map<String, Object>) JSON.deserializeUntyped(result.lastStepJson);
+        Assert.areEqual('TOOL_CALL', parsed.get('stepType'));
+        Assert.areEqual('QueryRecords', parsed.get('toolName'));
+        Assert.isTrue((Boolean) parsed.get('success'));
+        Assert.isNotNull(parsed.get('toolResult'));
+    }
+
+    @IsTest
+    static void testStepToolCallWithMissingToolReturnsToolNotFoundJson() {
+        FC_ModelsAPIService.clearMocks();
+        // Use a tool name the agent doesn't have.
+        FC_ModelsAPIService.enqueueMock(
+            '{"thought":"t","action":"TOOL_CALL","tool":"MissingTool",'
+                + '"parameters":{"query":"SELECT Id FROM Account LIMIT 1"}}'
+        );
+
+        FC_AgentExecutorStep executor = new FC_AgentExecutorStep(buildAgent());
+        FC_StepRequest req = executor.initialise(buildTask(), null);
+
+        FC_StepRequest result = executor.step(req);
+        Assert.isFalse(result.isComplete);
+        Assert.isNotNull(result.lastStepJson);
+
+        Map<String, Object> parsed =
+            (Map<String, Object>) JSON.deserializeUntyped(result.lastStepJson);
+        Assert.areEqual('TOOL_CALL', parsed.get('stepType'));
+        Assert.areEqual('MissingTool', parsed.get('toolName'));
+        Assert.isTrue((Boolean) parsed.get('success'));
+
+        // toolResult is a JSON string; just verify the error marker exists.
+        Assert.isTrue(String.valueOf(parsed.get('toolResult')).contains('not found'));
+    }
 }

@@ -154,9 +154,6 @@ public class FC_CrewQueueable implements Queueable {
             + ' crew="' + config.crewName + '"'
             + ' jobId=' + context.getJobId());
 
-        // 2. Mark running
-        updateCrewRunStatus(crewRunId, STATUS_RUNNING, null, null, taskOutputs);
-
         if (taskIndex >= config.tasks.size()) {
             // Defensive: all tasks done
             finalise(crewRunId, config, taskOutputs, null);
@@ -292,6 +289,7 @@ public class FC_CrewQueueable implements Queueable {
 
     // ─── Build Helpers ────────────────────────────────────────────────────────
 
+    @TestVisible
     private static FC_Agent buildAgent(AgentConfig cfg) {
         FC_Agent.Builder b = new FC_Agent.Builder(cfg.role)
             .goal(cfg.goal)
@@ -315,6 +313,7 @@ public class FC_CrewQueueable implements Queueable {
         return b.build();
     }
 
+    @TestVisible
     private static FC_Task buildTask(TaskConfig cfg) {
         FC_Task.Builder b = new FC_Task.Builder(cfg.name)
             .description(cfg.description)
@@ -324,6 +323,7 @@ public class FC_CrewQueueable implements Queueable {
         return b.build();
     }
 
+    @TestVisible
     private static AgentConfig resolveAgent(List<AgentConfig> agents, String role) {
         if (String.isBlank(role)) return agents.isEmpty() ? null : agents[0];
         for (AgentConfig cfg : agents) {
@@ -334,6 +334,7 @@ public class FC_CrewQueueable implements Queueable {
 
     // ─── Config Conversion ────────────────────────────────────────────────────
 
+    @TestVisible
     private static CrewRunConfig buildCrewRunConfig(FC_Crew crew, String correlationId) {
         CrewRunConfig config   = new CrewRunConfig();
         config.crewName        = crew.getName();
@@ -351,14 +352,11 @@ public class FC_CrewQueueable implements Queueable {
             ac.maxIterations = agent.maxIterations;
             ac.llmModel     = agent.llmModel;
             ac.toolClassNames = new List<String>();
-            // Collect class names only for FC_IMCPTool instances (round-trippable)
             for (FC_Tool tool : agent.tools) {
-                // FC_Tool.fromMCP / fromClassName stores the class name via getName()
-                // but we need the implementing class name, not the tool name.
-                // Convention: tools registered via fromClassName() can be re-instantiated.
-                // Tools registered via from() (plain FC_ITool) CANNOT be round-tripped.
-                // The caller must use toolClassNames on AgentConfig explicitly.
-                // See setupInstructions() for guidance.
+                String cls = tool.getSourceClassName();
+                if (String.isNotBlank(cls)) {
+                    ac.toolClassNames.add(cls);
+                }
             }
             config.agents.add(ac);
         }
@@ -376,6 +374,7 @@ public class FC_CrewQueueable implements Queueable {
         return config;
     }
 
+    @TestVisible
     private static Map<String, String> deserialiseTaskOutputs(String json_x) {
         if (String.isBlank(json_x)) return new Map<String, String>();
         try {

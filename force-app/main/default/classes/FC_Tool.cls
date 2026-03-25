@@ -18,6 +18,7 @@ public class FC_Tool {
     private String              description;
     private List<FC_ToolParameter> parameters;
     private FC_ITool            implementation;
+    private String              sourceClassName;
 
     private FC_Tool() {}
 
@@ -87,7 +88,9 @@ public class FC_Tool {
         }
         Object instance = t.newInstance();
         if (instance instanceof FC_IMCPTool) {
-            return fromMCP((FC_IMCPTool) instance);
+            FC_Tool tool = fromMCP((FC_IMCPTool) instance);
+            tool.sourceClassName = className;
+            return tool;
         }
         if (instance instanceof FC_ITool) {
             throw new FC_Exception.ConfigurationException(
@@ -98,6 +101,11 @@ public class FC_Tool {
         throw new FC_Exception.ToolNotFoundException(
             'Class "' + className + '" does not implement FC_ITool or FC_IMCPTool'
         );
+    }
+
+    /** Returns the Apex class name used when this tool was registered via fromClassName(). Null otherwise. */
+    public String getSourceClassName() {
+        return sourceClassName;
     }
 
     // ─── Getters ──────────────────────────────────────────────────────────────
