@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>LeadId__c</fullName>
+    <label>Lead</label>
+    <type>Lookup</type>
+    <referenceTo>Lead</referenceTo>
+    <relationshipName>ConversationMessages</relationshipName>
+    <relationshipLabel>Conversation Messages</relationshipLabel>
+    <externalId>false</externalId>
+    <trackTrending>false</trackTrending>
+</CustomField>
