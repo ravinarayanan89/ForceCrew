@@ -251,10 +251,8 @@ public class FC_CrewQueueableTest {
         FC_Crew crew = buildSimpleCrew('Crew Success', true, true);
 
         FC_CrewQueueable.CrewRunConfig config = buildConfigForRun(crew, 'CORR-SUCCESS');
-        // Cover buildAgent tool loading success + failure:
-        // - valid tool class should be instantiated
-        // - invalid class should be caught/logged without throwing
-        config.agents[0].toolClassNames = new List<String>{ 'FC_SampleSOQLTool', 'NonExistentClassName_XYZ', '' };
+        // Cover buildAgent tool loading: valid class + blank entry should both work.
+        config.agents[0].toolClassNames = new List<String>{ 'FC_SampleSOQLTool', '' };
 
         Map<String, String> initialOutputs = new Map<String, String>{ 'Task A' => 'seed value' };
         Id runId = createCrewRunRecord(config, initialOutputs);
@@ -299,6 +297,31 @@ public class FC_CrewQueueableTest {
         Assert.isNotNull(run.ErrorMessage__c);
         Assert.isNull(run.FinalOutput__c);
         Assert.isTrue(run.ErrorMessage__c.contains('No agent with role'));
+    }
+
+    @IsTest
+    static void testExecuteToolLoadFailureFailFastSetsFailed() {
+        FC_Crew crew = buildSimpleCrew('Crew Tool Load Failure', false, true);
+
+        FC_CrewQueueable.CrewRunConfig config = buildConfigForRun(crew, 'CORR-TOOL-FAIL');
+        config.agents[0].toolClassNames = new List<String>{ 'NonExistentClassName_XYZ' };
+
+        Map<String, String> initialOutputs = new Map<String, String>{ 'Task A' => 'seed value' };
+        Id runId = createCrewRunRecord(config, initialOutputs);
+
+        FC_CrewQueueable job = new FC_CrewQueueable(runId, 0);
+        job.execute(new MockQueueableContext());
+
+        FC_CrewRun__c run = [
+            SELECT Status__c, FinalOutput__c, ErrorMessage__c
+            FROM FC_CrewRun__c
+            WHERE Id = :runId
+        ];
+        Assert.areEqual(FC_CrewQueueable.STATUS_FAILED, run.Status__c);
+        Assert.isNotNull(run.ErrorMessage__c);
+        Assert.isNull(run.FinalOutput__c);
+        Assert.isTrue(run.ErrorMessage__c.contains('could not be built'));
+        Assert.isTrue(run.ErrorMessage__c.contains('NonExistentClassName_XYZ'));
     }
 
     @IsTest
@@ -373,17 +396,33 @@ public class FC_CrewQueueableTest {
 
     @IsTest
     static void testBuildAgentToolClassNamesSuccessAndFailure() {
-        FC_CrewQueueable.AgentConfig cfg = new FC_CrewQueueable.AgentConfig();
-        cfg.role = 'Analyst';
-        cfg.goal = 'Analyse data';
-        cfg.backstory = 'Expert analyst';
-        cfg.maxIterations = 1;
-        cfg.llmModel = FC_ModelsAPIService.MODEL_GPT4O_MINI;
-        cfg.toolClassNames = new List<String>{ 'FC_SampleSOQLTool', 'NonExistentClassName_XYZ', '' };
+        // Valid tool class names (plus a blank entry) load successfully.
+        FC_CrewQueueable.AgentConfig okCfg = new FC_CrewQueueable.AgentConfig();
+        okCfg.role = 'Analyst';
+        okCfg.goal = 'Analyse data';
+        okCfg.backstory = 'Expert analyst';
+        okCfg.maxIterations = 1;
+        okCfg.llmModel = FC_ModelsAPIService.MODEL_GPT4O_MINI;
+        okCfg.toolClassNames = new List<String>{ 'FC_SampleSOQLTool', '' };
 
-        FC_Agent agent = (FC_Agent) FC_CrewQueueable.buildAgent(cfg);
+        FC_Agent agent = (FC_Agent) FC_CrewQueueable.buildAgent(okCfg);
         Assert.isNotNull(agent);
         Assert.isNotNull(agent.getTool('QueryRecords'));
+
+        // A tool class that fails to load must fail the whole build — silently running
+        // the agent without it would produce answers with no signal that it's incomplete.
+        FC_CrewQueueable.AgentConfig badCfg = new FC_CrewQueueable.AgentConfig();
+        badCfg.role = 'Analyst';
+        badCfg.goal = 'Analyse data';
+        badCfg.backstory = 'Expert analyst';
+        badCfg.toolClassNames = new List<String>{ 'NonExistentClassName_XYZ' };
+
+        try {
+            FC_CrewQueueable.buildAgent(badCfg);
+            Assert.fail('Expected buildAgent to throw when a tool class cannot be loaded');
+        } catch (FC_Exception.ToolNotFoundException e) {
+            Assert.isTrue(e.getMessage().contains('NonExistentClassName_XYZ'));
+        }
     }
 
     @IsTest

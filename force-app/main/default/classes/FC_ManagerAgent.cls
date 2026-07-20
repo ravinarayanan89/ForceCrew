@@ -8,6 +8,12 @@
  * The manager communicates via the same ReAct-style JSON protocol, but with
  * DELEGATE and FINAL_ANSWER actions instead of TOOL_CALL.
  *
+ * This class runs the ENTIRE manager loop (up to 20 rounds, each possibly running a
+ * full agent ReAct loop) inside ONE Apex transaction — fine for short synchronous
+ * demos, but any real multi-step crew will exceed synchronous CPU/callout limits.
+ * For production use, prefer FC_HierarchicalCrewQueueable, which runs one manager
+ * round per background job with no per-transaction limit on total rounds or tasks.
+ *
  * @group ForceCrew
  */
 public with sharing class FC_ManagerAgent {

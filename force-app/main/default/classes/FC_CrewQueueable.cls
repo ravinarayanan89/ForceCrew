@@ -46,6 +46,7 @@ public class FC_CrewQueueable implements Queueable {
         public Boolean          verbose;
         public Boolean          failFast;
         public String           correlationId;
+        public String           managerLlmModel;
         public List<AgentConfig> agents;
         public List<TaskConfig>  tasks;
     }
@@ -96,7 +97,7 @@ public class FC_CrewQueueable implements Queueable {
         if (crew.getProcess() == FC_Process.Type.HIERARCHICAL) {
             throw new FC_Exception.ConfigurationException(
                 'FC_CrewQueueable supports SEQUENTIAL process only. '
-                + 'Run HIERARCHICAL crews via FC_Crew.kickoff() inside a standalone Queueable.'
+                + 'Use FC_HierarchicalCrewQueueable.enqueue() for HIERARCHICAL crews.'
             );
         }
 
@@ -164,17 +165,30 @@ public class FC_CrewQueueable implements Queueable {
         TaskConfig  taskCfg  = config.tasks[taskIndex];
         AgentConfig agentCfg = resolveAgent(config.agents, taskCfg.assignedAgentRole);
 
+        String   agentBuildError = null;
+        FC_Agent agent           = null;
+
         if (agentCfg == null) {
-            String err = 'No agent with role "' + taskCfg.assignedAgentRole + '"';
-            FC_Logger.error('FC_CrewQueueable', err);
+            agentBuildError = 'No agent with role "' + taskCfg.assignedAgentRole + '"';
+        } else {
+            try {
+                agent = buildAgent(agentCfg);
+            } catch (Exception e) {
+                // A tool failed to load — running the agent with a silently incomplete
+                // toolset would produce answers it has no way of flagging as unreliable.
+                agentBuildError = 'Agent "' + agentCfg.role + '" could not be built: ' + e.getMessage();
+            }
+        }
+
+        if (agentBuildError != null) {
+            FC_Logger.error('FC_CrewQueueable', agentBuildError);
             if (config.failFast) {
-                finalise(crewRunId, config, taskOutputs, err);
+                finalise(crewRunId, config, taskOutputs, agentBuildError);
                 return;
             }
         } else {
             // 4. Execute this task (full ReAct loop within this job's transaction)
-            FC_Agent agent = buildAgent(agentCfg);
-            FC_Task  task  = buildTask(taskCfg);
+            FC_Task task = buildTask(taskCfg);
 
             FC_AgentExecutor executor = new FC_AgentExecutor(agent);
             FC_TaskResult    result   = executor.execute(task, taskOutputs);
@@ -288,9 +302,10 @@ public class FC_CrewQueueable implements Queueable {
     }
 
     // ─── Build Helpers ────────────────────────────────────────────────────────
+    // Public: shared with FC_HierarchicalCrewQueueable, which reconstructs the same
+    // agents/tasks from CrewRunConfig for its own per-round delegation.
 
-    @TestVisible
-    private static FC_Agent buildAgent(AgentConfig cfg) {
+    public static FC_Agent buildAgent(AgentConfig cfg) {
         FC_Agent.Builder b = new FC_Agent.Builder(cfg.role)
             .goal(cfg.goal)
             .backstory(cfg.backstory);
@@ -299,22 +314,30 @@ public class FC_CrewQueueable implements Queueable {
         if (cfg.llmModel      != null) b.llmModel(cfg.llmModel);
 
         if (cfg.toolClassNames != null) {
+            List<String> failedTools = new List<String>();
             for (String cls : cfg.toolClassNames) {
                 if (String.isNotBlank(cls)) {
                     try {
                         b.tool(FC_Tool.fromClassName(cls));
                     } catch (Exception e) {
-                        FC_Logger.warn('FC_CrewQueueable',
+                        FC_Logger.error('FC_CrewQueueable',
                             'Could not load tool "' + cls + '": ' + e.getMessage());
+                        failedTools.add(cls);
                     }
                 }
+            }
+            // Refuse to run the agent with a silently incomplete toolset — a missing tool
+            // changes what the agent can actually do without any signal in its output.
+            if (!failedTools.isEmpty()) {
+                throw new FC_Exception.ToolNotFoundException(
+                    'Agent "' + cfg.role + '" is missing tool(s): ' + String.join(failedTools, ', ')
+                );
             }
         }
         return b.build();
     }
 
-    @TestVisible
-    private static FC_Task buildTask(TaskConfig cfg) {
+    public static FC_Task buildTask(TaskConfig cfg) {
         FC_Task.Builder b = new FC_Task.Builder(cfg.name)
             .description(cfg.description)
             .expectedOutput(cfg.expectedOutput)
@@ -323,8 +346,7 @@ public class FC_CrewQueueable implements Queueable {
         return b.build();
     }
 
-    @TestVisible
-    private static AgentConfig resolveAgent(List<AgentConfig> agents, String role) {
+    public static AgentConfig resolveAgent(List<AgentConfig> agents, String role) {
         if (String.isBlank(role)) return agents.isEmpty() ? null : agents[0];
         for (AgentConfig cfg : agents) {
             if (cfg.role == role) return cfg;
@@ -334,14 +356,14 @@ public class FC_CrewQueueable implements Queueable {
 
     // ─── Config Conversion ────────────────────────────────────────────────────
 
-    @TestVisible
-    private static CrewRunConfig buildCrewRunConfig(FC_Crew crew, String correlationId) {
+    public static CrewRunConfig buildCrewRunConfig(FC_Crew crew, String correlationId) {
         CrewRunConfig config   = new CrewRunConfig();
         config.crewName        = crew.getName();
         config.process         = crew.getProcess().name();
         config.verbose         = crew.isVerbose();
         config.failFast        = crew.isFailFast();
         config.correlationId   = correlationId;
+        config.managerLlmModel = crew.getManagerLlmModel();
 
         config.agents = new List<AgentConfig>();
         for (FC_Agent agent : crew.getAgents()) {
@@ -374,8 +396,7 @@ public class FC_CrewQueueable implements Queueable {
         return config;
     }
 
-    @TestVisible
-    private static Map<String, String> deserialiseTaskOutputs(String json_x) {
+    public static Map<String, String> deserialiseTaskOutputs(String json_x) {
         if (String.isBlank(json_x)) return new Map<String, String>();
         try {
             Map<String, Object> raw = (Map<String, Object>) JSON.deserializeUntyped(json_x);
@@ -403,15 +424,16 @@ public class FC_CrewQueueable implements Queueable {
      */
     public static String setupInstructions() {
         return '=== FC_CrewQueueable Required Metadata ===\n\n'
-            + '1. Custom Object: FC_CrewRun__c\n'
+            + '1. Custom Object: FC_CrewRun__c (shared with FC_HierarchicalCrewQueueable)\n'
             + '   Fields:\n'
-            + '   - CrewName__c         Text(255)\n'
-            + '   - Status__c           Picklist: Pending, Running, Completed, Failed\n'
-            + '   - CrewConfigJson__c   Long Text Area(131072)  — full crew JSON config\n'
-            + '   - TaskOutputsJson__c  Long Text Area(131072)  — accumulated task outputs\n'
-            + '   - FinalOutput__c      Long Text Area(32768)   — final crew output\n'
-            + '   - ErrorMessage__c     Text(1024)\n'
-            + '   - CorrelationId__c    Text(255)\n\n'
+            + '   - CrewName__c           Text(255)\n'
+            + '   - Status__c             Picklist: Pending, Running, Completed, Failed\n'
+            + '   - CrewConfigJson__c     Long Text Area(131072)  — full crew JSON config\n'
+            + '   - TaskOutputsJson__c    Long Text Area(131072)  — accumulated task outputs\n'
+            + '   - ManagerHistoryJson__c Long Text Area(131072)  — HIERARCHICAL only: manager chat history\n'
+            + '   - FinalOutput__c        Long Text Area(32768)   — final crew output\n'
+            + '   - ErrorMessage__c       Text(1024)\n'
+            + '   - CorrelationId__c      Text(255)\n\n'
             + '2. Tool Requirement:\n'
             + '   All tools used in async crews MUST implement FC_IMCPTool\n'
             + '   and be registered via FC_Tool.fromClassName(\'MyToolClass\').\n'

@@ -174,9 +174,35 @@ sf project deploy start --target-org my-sandbox
 
 ### 🗄️ FC_CrewRun__c Custom Object (for Backend Async Only)
 
-Only needed if you use `FC_CrewQueueable` from a **trigger, scheduled job, or batch process**. Not required for LWC — use the [Step-by-Step pattern](#step-by-step-lwc--recommended-for-complex-tasks) instead.
+Only needed if you use `FC_CrewQueueable` / `FC_HierarchicalCrewQueueable` from a **trigger, scheduled job, or batch process**. Not required for LWC — use the [Step-by-Step pattern](#step-by-step-lwc--recommended-for-complex-tasks) instead.
 
 `FC_CrewRun__c` is included in the repo and deploys automatically with `sf project deploy start`. No manual setup needed.
+
+### 🔐 Permission Set — `ForceCrew_Access`
+
+Salesforce does **not** grant Field-Level Security to any profile by default when custom fields deploy via source format — so right after deploying, `FC_CrewRun__c` and its fields are invisible even to System Administrator until access is explicitly granted.
+
+The repo includes a ready-made permission set for this: `ForceCrew_Access` (`force-app/main/default/permissionsets/ForceCrew_Access.permissionset-meta.xml`). It grants:
+
+- Full CRUD + FLS (read/edit) on every `FC_CrewRun__c` field, including `ManagerHistoryJson__c`
+- Apex class access to every `FC_*` / `ForceCrew` class
+
+**Assign it to any user who will run crews** — anyone calling `FC_CrewController` from LWC/Flow, or anyone whose trigger/scheduled job enqueues `FC_CrewQueueable` / `FC_HierarchicalCrewQueueable`:
+
+```bash
+sf org assign permset --name ForceCrew_Access --target-org my-org
+```
+
+Or for another user (requires System Administrator or "Manage Users"):
+
+```apex
+insert new PermissionSetAssignment(
+    AssigneeId      = someUserId,
+    PermissionSetId = [SELECT Id FROM PermissionSet WHERE Name = 'ForceCrew_Access'].Id
+);
+```
+
+Skip assigning this to integration/automated-process users, restricted-license users (e.g. Chatter Free), or Experience Cloud Guest users — those either can't take custom permission sets or shouldn't receive this level of CRUD/FLS access.
 
 ---
 

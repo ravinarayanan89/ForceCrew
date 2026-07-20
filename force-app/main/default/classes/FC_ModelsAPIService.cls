@@ -42,6 +42,12 @@ public with sharing class FC_ModelsAPIService {
     // ── Default ──────────────────────────────────────────────────────────────
     public static final String MODEL_DEFAULT           = MODEL_CLAUDE_OPUS45;
 
+    // ── Retry ────────────────────────────────────────────────────────────────
+    // Transient failures (HTTP 429/5xx, network-level exceptions) are retried
+    // immediately up to MAX_ATTEMPTS total tries. Non-transient errors (4xx other
+    // than 429) fail fast without wasting callouts.
+    private static final Integer MAX_ATTEMPTS = 3;
+
     // ─── Test Seam ────────────────────────────────────────────────────────────
     // Queued mock responses consumed by chat() during @IsTest execution.
     // Tests call enqueueMock() / enqueueMockFailure() before triggering LLM calls.
@@ -91,38 +97,62 @@ public with sharing class FC_ModelsAPIService {
             return mockResponses.remove(0);
         }
 
-        try {
-            aiplatform.ModelsAPI.createChatGenerations_Request request = buildRequest(messages);
+        String lastError = 'Unknown error calling Models API';
 
-            FC_Logger.debug(
-                'FC_ModelsAPIService',
-                'Sending ' + messages.size() + ' messages to model: ' + model
-            );
+        for (Integer attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                aiplatform.ModelsAPI.createChatGenerations_Request request = buildRequest(messages);
 
-            aiplatform.ModelsAPI.createChatGenerations_Response response =
-                new aiplatform.ModelsAPI().createChatGenerations(request);
+                FC_Logger.debug(
+                    'FC_ModelsAPIService',
+                    'Sending ' + messages.size() + ' messages to model: ' + model
+                    + (attempt > 1 ? ' (attempt ' + attempt + '/' + MAX_ATTEMPTS + ')' : '')
+                );
 
-            if (response?.Code200?.generationDetails?.generations == null
-                || response.Code200.generationDetails.generations.isEmpty()) {
-                return chatFailure('Models API returned an empty generations list');
+                aiplatform.ModelsAPI.createChatGenerations_Response response =
+                    new aiplatform.ModelsAPI().createChatGenerations(request);
+
+                if (response?.Code200?.generationDetails?.generations == null
+                    || response.Code200.generationDetails.generations.isEmpty()) {
+                    lastError = 'Models API returned an empty generations list';
+                    FC_Logger.warn('FC_ModelsAPIService',
+                        lastError + ' (attempt ' + attempt + '/' + MAX_ATTEMPTS + ')');
+                    continue;
+                }
+
+                String content      = response.Code200.generationDetails.generations[0].content;
+                String generationId = response.Code200.generationDetails.generations[0].id;
+
+                FC_Logger.debug('FC_ModelsAPIService', 'Response received [id=' + generationId + ']');
+
+                return chatOk(content, generationId);
+
+            } catch (aiplatform.ModelsAPI.createChatGenerations_ResponseException e) {
+                lastError = 'Models API error [HTTP ' + e.responseCode + ']: ' + e.getMessage();
+                FC_Logger.warn('FC_ModelsAPIService',
+                    lastError + ' (attempt ' + attempt + '/' + MAX_ATTEMPTS + ')');
+                if (!isRetryableStatus(e.responseCode) || attempt == MAX_ATTEMPTS) {
+                    FC_Logger.error('FC_ModelsAPIService', lastError);
+                    return chatFailure(lastError);
+                }
+            } catch (Exception e) {
+                lastError = 'Unexpected error calling Models API: ' + e.getMessage();
+                FC_Logger.warn('FC_ModelsAPIService',
+                    lastError + ' (attempt ' + attempt + '/' + MAX_ATTEMPTS + ')');
+                if (attempt == MAX_ATTEMPTS) {
+                    FC_Logger.error('FC_ModelsAPIService', lastError);
+                    return chatFailure(lastError);
+                }
             }
-
-            String content      = response.Code200.generationDetails.generations[0].content;
-            String generationId = response.Code200.generationDetails.generations[0].id;
-
-            FC_Logger.debug('FC_ModelsAPIService', 'Response received [id=' + generationId + ']');
-
-            return chatOk(content, generationId);
-
-        } catch (aiplatform.ModelsAPI.createChatGenerations_ResponseException e) {
-            String msg = 'Models API error [HTTP ' + e.responseCode + ']: ' + e.getMessage();
-            FC_Logger.error('FC_ModelsAPIService', msg);
-            return chatFailure(msg);
-        } catch (Exception e) {
-            String msg = 'Unexpected error calling Models API: ' + e.getMessage();
-            FC_Logger.error('FC_ModelsAPIService', msg);
-            return chatFailure(msg);
         }
+
+        FC_Logger.error('FC_ModelsAPIService', lastError);
+        return chatFailure(lastError);
+    }
+
+    /** HTTP 429 (rate limit) and 5xx (server-side) are treated as transient and worth retrying. */
+    private static Boolean isRetryableStatus(Integer responseCode) {
+        return responseCode == null || responseCode == 429 || responseCode >= 500;
     }
 
     // ─── Private ──────────────────────────────────────────────────────────────

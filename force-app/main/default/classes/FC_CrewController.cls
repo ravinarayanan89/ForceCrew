@@ -252,13 +252,14 @@ public with sharing class FC_CrewController {
     }
 
     /**
-     * Enqueues a crew for fully asynchronous execution via FC_CrewQueueable.
-     * Results are pushed back via FC_CrewEvent__e Platform Event.
+     * Enqueues a crew for fully asynchronous execution — SEQUENTIAL crews run via
+     * FC_CrewQueueable (one task per job); HIERARCHICAL crews run via
+     * FC_HierarchicalCrewQueueable (one manager round per job).
      * Use this for multi-task, multi-agent crews where governor limits are a concern.
      *
-     * @param crewConfigJson  Same JSON schema as runCrewFromConfig (SEQUENTIAL only)
+     * @param crewConfigJson  Same JSON schema as runCrewFromConfig (SEQUENTIAL or HIERARCHICAL)
      * @param correlationId   Optional ID to correlate the async result (e.g., a record Id)
-     * @return The Queueable job Id
+     * @return The FC_CrewRun__c record Id (poll its Status__c / FinalOutput__c)
      */
     @AuraEnabled(cacheable=false)
     public static String enqueueCrewAsync(String crewConfigJson, String correlationId) {
@@ -270,8 +271,10 @@ public with sharing class FC_CrewController {
                 ? (Map<String, Object>) config.get('inputs')
                 : null;
 
-            Id jobId = FC_CrewQueueable.enqueue(crew, inputs, correlationId);
-            return jobId;
+            Id runId = (crew.getProcess() == FC_Process.Type.HIERARCHICAL)
+                ? FC_HierarchicalCrewQueueable.enqueue(crew, inputs, correlationId)
+                : FC_CrewQueueable.enqueue(crew, inputs, correlationId);
+            return runId;
 
         } catch (Exception e) {
             throw new AuraHandledException(e.getMessage());

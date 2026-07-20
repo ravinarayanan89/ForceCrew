@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>ManagerHistoryJson__c</fullName>
+    <label>Manager History JSON</label>
+    <description>Serialised manager conversation history (list of {role, content}) for HIERARCHICAL crews. Persisted between FC_HierarchicalCrewQueueable rounds so the manager LLM sees the full conversation across chained jobs.</description>
+    <type>LongTextArea</type>
+    <length>131072</length>
+    <visibleLines>5</visibleLines>
+    <externalId>false</externalId>
+    <trackTrending>false</trackTrending>
+</CustomField>

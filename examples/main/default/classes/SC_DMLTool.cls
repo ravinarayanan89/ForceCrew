@@ -108,9 +108,9 @@ public with sharing class SC_DMLTool implements FC_IMCPTool {
 
             if (operation == 'update') {
                 record.put('Id', (Id) recordIdStr);
-                update record;
+                Database.update(record, AccessLevel.USER_MODE);
             } else {
-                insert record;
+                Database.insert(record, AccessLevel.USER_MODE);
             }
 
             return JSON.serialize(new Map<String, Object>{
