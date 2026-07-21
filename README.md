@@ -16,33 +16,42 @@ System.debug(result.finalOutput);
 
 ---
 
+## 🎥 Demo
+
+[![ForceCrew Demo](https://img.youtube.com/vi/IQqbs7fhc70/maxresdefault.jpg)](https://www.youtube.com/watch?v=IQqbs7fhc70&t=39s)
+
+Watch 4 AI agents run a streetwear shop end-to-end, natively inside Salesforce. Read the full writeup: [I Built a Streetwear Shop Where 4 AI Agents Close Deals — All Inside Salesforce](https://medium.com/@ravi0389/i-built-a-streetwear-shop-where-4-ai-agents-close-deals-all-inside-salesforce-8758db388176)
+
+---
+
 ## 📋 Table of Contents
 
-1. [Why ForceCrew](#why-forcecrew)
-2. [Architecture Overview](#architecture-overview)
-3. [Installation](#installation)
-4. [Core Concepts](#core-concepts)
+1. [Demo](#-demo)
+2. [Why ForceCrew](#why-forcecrew)
+3. [Architecture Overview](#architecture-overview)
+4. [Installation](#installation)
+5. [Core Concepts](#core-concepts)
    - [Crew](#crew)
    - [Agent](#agent)
    - [Task](#task)
    - [Tool](#tool)
-5. [Choosing Your LLM Model](#choosing-your-llm-model)
-6. [Quick Start](#quick-start)
-7. [Execution Modes](#execution-modes)
+6. [Choosing Your LLM Model](#choosing-your-llm-model)
+7. [Quick Start](#quick-start)
+8. [Execution Modes](#execution-modes)
    - [Sequential](#sequential-mode)
    - [Hierarchical](#hierarchical-mode)
-8. [Calling from Apex](#calling-from-apex)
-9. [Calling from LWC](#calling-from-lwc)
-   - [Full Transaction](#full-transaction-lwc)
-   - [Step-by-Step (Governor-Limit Safe)](#step-by-step-lwc)
-10. [Async Execution (Queueable)](#async-execution-queueable)
-11. [Building Custom Tools](#building-custom-tools)
-12. [Logging & Observability](#logging--observability)
-13. [Error Handling](#error-handling)
-14. [API Reference](#api-reference)
-15. [Class Inventory](#class-inventory)
-16. [Testing](#testing)
-17. [Requirements](#requirements)
+9. [Calling from Apex](#calling-from-apex)
+10. [Calling from LWC](#calling-from-lwc)
+    - [Full Transaction](#full-transaction-lwc)
+    - [Step-by-Step (Governor-Limit Safe)](#step-by-step-lwc)
+11. [Async Execution (Queueable)](#async-execution-queueable)
+12. [Building Custom Tools](#building-custom-tools)
+13. [Logging & Observability](#logging--observability)
+14. [Error Handling](#error-handling)
+15. [API Reference](#api-reference)
+16. [Class Inventory](#class-inventory)
+17. [Testing](#testing)
+18. [Requirements](#requirements)
 
 ---
 
